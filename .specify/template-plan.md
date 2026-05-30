@@ -10,6 +10,7 @@ Ein Diagramm (ASCII oder Link auf `docs/`) + 3–5 Sätze Erklärung der Datenfl
 ## Komponenten
 
 Pro Komponente:
+
 - **Name + Verantwortung** (eine Aussage)
 - **Runtime / Trigger** (Lambda + EventBridge / WebSocket Route / React Hook / …)
 - **In/Out** (Eingangs- und Ausgangsverträge — Typen, Schemas, Event-Shapes)

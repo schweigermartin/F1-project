@@ -14,6 +14,7 @@ Atomare, sequenzielle Schritte. Jeder Task = ein Commit. Reihenfolge nicht belie
 ## Aufgaben
 
 ### T1 — <kurzer Titel>
+
 - **Output:** …
 - **Verify:** …
 - **Notes:** Risiken, Constitution-Bezug.
@@ -21,5 +22,6 @@ Atomare, sequenzielle Schritte. Jeder Task = ein Commit. Reihenfolge nicht belie
 ### T2 — …
 
 ### Tn — Demo-Check
+
 - **Output:** Live-Artefakt aus Spec → Definition of Done
 - **Verify:** Recruiter-Test (Phase ist ohne Erklärung verständlich).

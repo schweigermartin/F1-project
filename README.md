@@ -23,14 +23,14 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 
 ## Phasen
 
-| # | Phase | Status | Ergebnis |
-|---|-------|--------|----------|
-| 0 | [Foundation](specs/000-foundation/spec.md) | spec-ready | Monorepo + AWS-Setup + CDK + S3-Layout |
-| 1 | [Data Pipeline](specs/001-data-pipeline/spec.md) | spec-ready | OpenF1 → SQS → Lambda → DynamoDB + S3 |
-| 2 | [Live Dashboard](specs/002-dashboard/spec.md) | stub | WebSocket-API + React-Frontend auf Vercel |
-| 3 | [ML Model](specs/003-ml-model/spec.md) | stub | XGBoost-Podium-Classifier + SHAP + S3-Artefakt |
-| 4 | [Inference + Bedrock](specs/004-inference-bedrock/spec.md) | stub | Inference-Lambda + Bedrock-Erklärung + Predictor-Frontend |
-| 5 | [Feedback Loop](specs/005-feedback-loop/spec.md) | stub | Hit-Rate-Tracking + optional Re-Training |
+| #   | Phase                                                      | Status     | Ergebnis                                                  |
+| --- | ---------------------------------------------------------- | ---------- | --------------------------------------------------------- |
+| 0   | [Foundation](specs/000-foundation/spec.md)                 | spec-ready | Monorepo + AWS-Setup + CDK + S3-Layout                    |
+| 1   | [Data Pipeline](specs/001-data-pipeline/spec.md)           | spec-ready | OpenF1 → SQS → Lambda → DynamoDB + S3                     |
+| 2   | [Live Dashboard](specs/002-dashboard/spec.md)              | stub       | WebSocket-API + React-Frontend auf Vercel                 |
+| 3   | [ML Model](specs/003-ml-model/spec.md)                     | stub       | XGBoost-Podium-Classifier + SHAP + S3-Artefakt            |
+| 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md) | stub       | Inference-Lambda + Bedrock-Erklärung + Predictor-Frontend |
+| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)           | stub       | Hit-Rate-Tracking + optional Re-Training                  |
 
 ## Stack
 

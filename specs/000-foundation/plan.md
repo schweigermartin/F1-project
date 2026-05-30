@@ -74,10 +74,8 @@
 - **`src/s3-layout.ts`** exportiert:
   ```ts
   export const S3_PATHS = {
-    rawSession: (date: string, sessionId: string) =>
-      `raw/sessions/${date}/${sessionId}.jsonl`,
-    modelArtifact: (version: string) =>
-      `models/${version}/model.json`,
+    rawSession: (date: string, sessionId: string) => `raw/sessions/${date}/${sessionId}.jsonl`,
+    modelArtifact: (version: string) => `models/${version}/model.json`,
     modelCard: (version: string) => `models/${version}/model_card.md`,
   } as const;
   ```
@@ -90,7 +88,7 @@
   1. `setup`: Checkout, pnpm install (mit Cache).
   2. `lint-ts`: `tsc --noEmit` über alle TS-Workspaces; `eslint .`.
   3. `cdk-synth`: `pnpm -F infra cdk synth` (validiert IaC ohne Deploy).
-  4. `python-lint` *(prepared, skipped solange `ml/` leer)*: `ruff check ml/`.
+  4. `python-lint` _(prepared, skipped solange `ml/` leer)_: `ruff check ml/`.
 
 ## Datenmodelle
 
@@ -112,6 +110,7 @@ Keine in Phase 0 (kein OpenF1, kein Bedrock).
 ## Observability
 
 Phase 0 hat noch keine laufenden Services. Vorbereitet:
+
 - CloudWatch Log Group Prefix `/f1/` (Convention) — Phase 1 nutzt das.
 - Standard-CDK-Tags auf alle Ressourcen: `Project=f1`, `Phase=<n>`, `ManagedBy=cdk`.
 

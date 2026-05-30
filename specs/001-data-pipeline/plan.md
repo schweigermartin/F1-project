@@ -43,11 +43,13 @@
 ## Komponenten
 
 ### 1. EventBridge Polling Rule (`PollingRule`)
+
 - **Verantwortung:** Triggert die Poller-Lambda alle 5 Sekunden — **nur** während aktiver Sessions.
 - **Trigger:** `rate(5 seconds)` (oder `cron`-basiert mit Zeitfenster).
 - **State:** über die Schedule-Sync-Lambda enabled/disabled.
 
 ### 2. Schedule-Sync Lambda (`scheduleSync.ts`)
+
 - **Verantwortung:** Liest 1×/Tag (cron `0 4 * * ? *` UTC) die OpenF1 `sessions`-Liste für die nächsten 48h. Für jede Session: berechnet Start −15min und Ende +30min, programmiert das als EventBridge-Schedule-Window für `PollingRule` (Enable/Disable per `enable_rule` / `disable_rule`-Calls oder besser: eine `aws-scheduler.Schedule` pro Session mit Window).
 - **Runtime:** Node 20 (TypeScript).
 - **In:** Cron-Event.
@@ -55,6 +57,7 @@
 - **Failure-Mode:** Bei Fehler → CloudWatch-Alarm (sonst läuft Pipeline am Renn-Wochenende nicht an). Idempotent (mehrfach ausführbar ohne Duplikate).
 
 ### 3. Poller Lambda (`poller.ts`)
+
 - **Verantwortung:** Eine Iteration = ein Snapshot. Holt parallel `positions`, `intervals`, `laps`, `stints` (alle 5s). `weather` nur jeden 6. Tick (also 30s).
 - **Runtime:** Node 20, ARM64 (billiger), 256 MB, Timeout 10s.
 - **In:** EventBridge-Event (ignoriert Body, ermittelt aktive Session aus DynamoDB-Lookup oder eigener Logik).
@@ -62,10 +65,11 @@
 - **Failure-Mode:**
   - HTTP 429 → exponential backoff (max 2 Retries innerhalb der Lambda-Invocation), dann skip dieser Tick.
   - HTTP 5xx → log, skip.
-  - Zod-Fail beim *Request-Sending* (sollte nie passieren) → throw, Lambda meldet Error.
+  - Zod-Fail beim _Request-Sending_ (sollte nie passieren) → throw, Lambda meldet Error.
 - **HTTP-Client:** `undici` (built-in seit Node 20, kein Extra-Bundle).
 
 ### 4. SQS Queue (`EventsQueue`) + DLQ
+
 - **Type:** Standard (Ordnung wird beim S3-Write hergestellt, siehe Spec R-5).
 - **Visibility Timeout:** 60s (Consumer-Lambda Timeout × ~6 für Retries).
 - **MessageRetention:** 1 Tag (lange genug für Backlog-Aufholen, kurz genug für Cost).
@@ -73,6 +77,7 @@
 - **Alarm:** `ApproximateNumberOfMessagesVisible` auf DLQ > 0 → Alarm.
 
 ### 5. Consumer Lambda (`consumer.ts`)
+
 - **Verantwortung:** Liest SQS-Batches (BatchSize 10, MaxBatchingWindow 5s). Pro Message:
   1. Validiert Payload-Schema (zweite Stufe nach Poller — Defense in Depth, weil Schema in Storage anders aussehen kann als im Transport).
   2. Schreibt Live-Items in DynamoDB (BatchWriteItem).
@@ -89,6 +94,7 @@
   - Alternative überlegt: DynamoDB Streams → Kinesis Firehose → S3 (mit Buffering). Verworfen für Phase 1: zu viele Moving Parts, höhere Kosten. Die einfache Lösung reicht.
 
 ### 6. Archiver Lambda (`archiver.ts`)
+
 - **Verantwortung:** Erkennt Session-Ende (30 Min ohne neue Events für eine `session_id`), liest alle Parts aus S3, sortiert per `fetched_at + endpoint`, schreibt finale JSONL, löscht Parts.
 - **Trigger:** EventBridge-Schedule `rate(15 minutes)` — leichtgewichtig.
 - **In:** Schedule-Tick.
@@ -96,6 +102,7 @@
 - **Failure-Mode:** Idempotent — wenn finale Datei schon existiert, überspringen.
 
 ### 7. DynamoDB Table (`F1LiveTable`)
+
 - **Single-Table-Design:**
   - `PK = session#<session_id>` (String)
   - `SK = <entity>#<...>` (String)
@@ -110,6 +117,7 @@
 - **GSI:** vorerst keiner — kommt in Phase 2 falls nötig.
 
 ### 8. CloudWatch (Logs, Metrics, Alarms)
+
 - **Log-Gruppen:** `/f1/poller`, `/f1/consumer`, `/f1/scheduleSync`, `/f1/archiver`. Retention 14 Tage.
 - **Custom Metrics:**
   - `SchemaValidationFailure` (Count, Dimension: endpoint).
@@ -127,6 +135,7 @@
 ### `packages/shared/src/openf1-schema.ts`
 
 Zod-Schemas pro OpenF1-Endpoint. Beispiel:
+
 ```ts
 export const PositionSchema = z.object({
   session_key: z.number(),
@@ -141,6 +150,7 @@ export type Position = z.infer<typeof PositionSchema>;
 ### `packages/shared/src/event-schema.ts`
 
 SQS-Message-Shape:
+
 ```ts
 export const PipelineEventSchema = z.object({
   session_id: z.string(),
@@ -163,6 +173,7 @@ Helpers für PK/SK-Konstruktion — kein Magic-String-Streuen.
 ## Security & IAM
 
 Pro Lambda eine eigene IAM-Rolle (least privilege):
+
 - **PollerRole:** `sqs:SendMessage` auf `EventsQueue`, `cloudwatch:PutMetricData`.
 - **ConsumerRole:** `sqs:ReceiveMessage/DeleteMessage/GetQueueAttributes` auf `EventsQueue`, `dynamodb:BatchWriteItem/PutItem/UpdateItem` auf `F1LiveTable`, `s3:PutObject` auf `arn:aws:s3:::<bucket>/raw/sessions/*/parts/*`, `cloudwatch:PutMetricData`.
 - **ArchiverRole:** `s3:ListBucket/GetObject/PutObject/DeleteObject` auf `raw/sessions/*`.
@@ -173,12 +184,22 @@ Keine Secrets in Phase 1 (OpenF1 ist key-frei).
 ## Observability
 
 Strukturierte Logs (JSON via `pino` oder Lambda-PowerTools-TS):
+
 ```json
-{"level":"info","msg":"poll.endpoint.ok","endpoint":"positions","session_id":"9158","latency_ms":287,"count":20}
+{
+  "level": "info",
+  "msg": "poll.endpoint.ok",
+  "endpoint": "positions",
+  "session_id": "9158",
+  "latency_ms": 287,
+  "count": 20
+}
 ```
+
 Korrelations-ID = `session_id + tick_id` (Hash aus fetched_at + endpoint).
 
 Dashboard `f1-pipeline` mit:
+
 - SQS-Tiefe (Live + DLQ)
 - Lambda-Invocations + Errors (alle 4)
 - Custom-Metrics
@@ -188,16 +209,16 @@ Dashboard `f1-pipeline` mit:
 
 Annahme: 20 Renn-Wochenenden × 2h Race + 1h Quali + 3×1h Practice ≈ 6h/Wochenende × 20 = 120h/Jahr aktives Polling.
 
-| Service | Posten | €/Jahr |
-|---|---|---|
-| Lambda (Poller) | 720 Tick/h × 120h = 86.400 Invocations × 256MB × ~500ms | ~0,30 |
-| Lambda (Consumer) | ähnliche Größenordnung | ~0,50 |
-| SQS | 86.400 × ~5 Endpoints = 432k Requests | gratis (1M frei) |
-| DynamoDB On-Demand | ~500k Writes + 100k Reads | ~0,80 |
-| S3 PutObjects | 86.400 Parts → konsolidiert | ~0,40 |
-| S3 Storage | 100 GB max | ~2,50 |
-| CloudWatch Logs | 14d Retention | ~1,00 |
-| **Gesamt** | | **~5,50 €/Jahr** |
+| Service            | Posten                                                  | €/Jahr           |
+| ------------------ | ------------------------------------------------------- | ---------------- |
+| Lambda (Poller)    | 720 Tick/h × 120h = 86.400 Invocations × 256MB × ~500ms | ~0,30            |
+| Lambda (Consumer)  | ähnliche Größenordnung                                  | ~0,50            |
+| SQS                | 86.400 × ~5 Endpoints = 432k Requests                   | gratis (1M frei) |
+| DynamoDB On-Demand | ~500k Writes + 100k Reads                               | ~0,80            |
+| S3 PutObjects      | 86.400 Parts → konsolidiert                             | ~0,40            |
+| S3 Storage         | 100 GB max                                              | ~2,50            |
+| CloudWatch Logs    | 14d Retention                                           | ~1,00            |
+| **Gesamt**         |                                                         | **~5,50 €/Jahr** |
 
 → Pro 2h-Rennen ≪ 1 € (AC-8 ✓).
 

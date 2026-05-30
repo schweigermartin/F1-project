@@ -90,10 +90,14 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Verify:** `pnpm -F @f1/dashboard build` grün (3 Routen: `/`, `/_not-found`, `ƒ /api/ws-token`). typecheck (alle 4 Workspaces) + Root-`pnpm lint` + `format:check` grün. Sauberer typecheck ohne `.next`/`next-env.d.ts` bestätigt → CI-tauglich.
 - **Notes:** Vercel-Projekt + Env-Wiring ist Deploy-Zeit (T14).
 
-### T10 — `useRaceSocket` + Zustand-Store
+### T10 — `useRaceSocket` + Zustand-Store — DONE
 
-- **Output:** `useRaceSocket`-Hook (Connect mit Token, Reconnect-Backoff < 5s, Re-`subscribe` nach Drop, `ServerMessage`-Zod-Validierung) + `useRaceStore` (Zustand): `snapshot`/`delta` → normalisiertes `drivers`-Modell, `mode` live/replay.
-- **Verify:** Testing-Library/Vitest — Reconnect nach simuliertem Drop, ungültige Message verworfen (AC-6), delta-Reducer korrekt. (AC-4)
+- **Output:**
+  - `src/store/race-store.ts` (Zustand): normalisiertes `{sessionId, mode, connection, drivers, weather, noLiveSession}`. `applySnapshot` (merged Fahrer → unterstützt gechunkte Frames), `applyDelta` (Weather-Slot vs. per-Fahrer-Patch), pure `applyEntity` (Position/Interval + monotone Stint/Lap-Updates).
+  - `src/lib/race-socket.ts` — DI-fähiger Controller (kein DOM): Token holen → Connect → `subscribe`/`replay`-Intent auf `open` (re-)senden, jede Frame via `ServerMessageSchema` validieren (Invalid → drop+report, AC-6), Reconnect mit **gedeckeltem Exp-Backoff (250ms→3s, immer < 5s, AC-4)** + Re-Subscribe.
+  - `src/hooks/use-race-socket.ts` (`'use client'`) — verdrahtet Controller (echtes `fetch`/`WebSocket`-Adapter) an den Store, mappt Message-Typen, gibt `startReplay`/`stopReplay` für T12.
+- **Verify:** 13 Vitest-Tests ohne DOM (Fake-WebSocket + injizierter Timer): Store (snapshot/merge/delta/weather/no-driver-skip, monotone stint/lap) + Controller (Connect+Token-URL+subscribe-on-open, valid-vs-invalid-Frame AC-6, Reconnect+Re-Subscribe < 5s AC-4, Backoff-Wachstum 250→3000-cap, kein Reconnect nach `close()`). `pnpm -F @f1/dashboard test`/`typecheck`/`build` + Root-`lint`/`format` grün.
+- **Notes:** Kern-Logik bewusst DOM-frei getestet (Controller-DI + pure Store) → kein Testing-Library/jsdom-Setup nötig; der Hook ist der dünne Wrapper.
 
 ### T11 — visx-Visualisierungen
 

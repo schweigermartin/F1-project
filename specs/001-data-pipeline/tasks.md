@@ -5,11 +5,14 @@
 
 Reihenfolge bewusst: Schemas → Stacks → Lambdas → Wiring → Live-Test.
 
-## T1 — OpenF1-Erkundung (Spike)
+## T1 — OpenF1-Erkundung (Spike) — DONE
 
-- **Output:** `docs/openf1-notes.md` mit: bestätigten Endpoints, Beispiel-Responses pro Endpoint, beobachtetem Rate-Limit-Verhalten, Antwort: "wie erkenne ich, wann eine Session aktiv ist".
-- **Verify:** Mindestens ein Endpoint per `curl` lokal abgefragt und dokumentiert.
-- **Notes:** Wegwerf-Spike, keine Production-Logik. Aber Voraussetzung für T2.
+- **Output:** [docs/openf1-notes.md](../../docs/openf1-notes.md) mit allen 6 Endpoints, Sample-Responses, Rate-Limit-Verhalten (~4 RPS), Session-Aktiv-Detektor, Stolperfallen.
+- **Verify:** Alle 6 Endpoints per `curl` gegen Session 11291 (Montréal Race 2026-05-24) erfolgreich abgefragt.
+- **Spike-Befunde, die ins Plan gewandert sind:**
+  - `/position` ist **singular**, nicht `/positions` (kostet sonst einen ganzen Test-Zyklus).
+  - Rate-Limit ist Token-Bucket-artig: 4 RPS Burst, dann 429 mit `Retry-After: 1`. Sequentielle Fetches im Poller ausreichend (5 × 100ms = 500ms pro Tick).
+  - Live-Datenfelder sind oft `null` (laufende Rundenzeiten etc.) → Zod-Schemas konsequent `nullable()`.
 
 ## T2 — Zod-Schemas in `packages/shared`
 

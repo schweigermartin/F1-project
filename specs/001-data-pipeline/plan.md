@@ -58,7 +58,7 @@
 
 ### 3. Poller Lambda (`poller.ts`)
 
-- **Verantwortung:** Eine Iteration = ein Snapshot. Holt parallel `positions`, `intervals`, `laps`, `stints` (alle 5s). `weather` nur jeden 6. Tick (also 30s).
+- **Verantwortung:** Eine Iteration = ein Snapshot. Holt parallel `position` (singular!), `intervals`, `laps`, `stints` (alle 5s). `weather` nur jeden 6. Tick (also 30s).
 - **Runtime:** Node 20, ARM64 (billiger), 256 MB, Timeout 10s.
 - **In:** EventBridge-Event (ignoriert Body, ermittelt aktive Session aus DynamoDB-Lookup oder eigener Logik).
 - **Out:** für jeden API-Response → Zod-validierte Events in SQS (eine Message pro Endpoint-Response, nicht pro Event — Batching für Cost). Message-Body: `{ session_id, endpoint, payload, fetched_at }`.
@@ -167,7 +167,7 @@ Helpers für PK/SK-Konstruktion — kein Magic-String-Streuen.
 
 ## Externe Verträge
 
-- **OpenF1:** Basis-URL `https://api.openf1.org/v1`. Endpoints `sessions`, `positions`, `intervals`, `laps`, `stints`, `weather`. Query-Param immer `session_key=<n>`. Public, kein Auth.
+- **OpenF1:** Basis-URL `https://api.openf1.org/v1`. Endpoints `sessions`, `position` (singular!), `intervals`, `laps`, `stints`, `weather`. Query-Param immer `session_key=<n>`. Rate-Limit ~4 RPS, dann `429` mit `Retry-After: 1`. Public, kein Auth. Vollständige Spike-Notizen → [docs/openf1-notes.md](../../docs/openf1-notes.md).
 - **AWS SDK v3:** `@aws-sdk/client-sqs`, `@aws-sdk/client-dynamodb`, `@aws-sdk/lib-dynamodb` (Document Client), `@aws-sdk/client-s3`, `@aws-sdk/client-cloudwatch`.
 
 ## Security & IAM

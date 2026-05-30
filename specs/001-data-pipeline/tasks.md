@@ -38,10 +38,13 @@ Reihenfolge bewusst: Schemas → Stacks → Lambdas → Wiring → Live-Test.
 - **Verify:** `cdk list` zeigt `F1-DataLayer` + `F1-Pipeline`. `cdk synth --quiet` grün.
 - **Stolperfalle:** `exactOptionalPropertyTypes: true` ist mit CDKs `IBucket`/`IFunction`-Interfaces inkompatibel (`isWebsite: boolean | undefined`). Lokal in `infra/tsconfig.json` ausgeschaltet — alle anderen strict-Flags bleiben an.
 
-## T5 — DynamoDB Table (Single-Table)
+## T5 — DynamoDB Table (Single-Table) — DONE
 
-- **Output:** Table-Definition in `pipeline-stack.ts` mit PK/SK, TTL-Attribut, Stream `NEW_AND_OLD_IMAGES`, On-Demand.
-- **Verify:** Snapshot-Test des synthetisierten Templates.
+- **Output:**
+  - `F1LiveTable` als `dynamodb.TableV2` in `PipelineStack`: PK/SK über `PK_ATTR`/`SK_ATTR`/`TTL_ATTR` aus `@f1/shared` (Constitution III), Billing On-Demand, TTL auf `expiresAt`, Stream `NEW_AND_OLD_IMAGES`, RemovalPolicy DESTROY (S3-Archiv ist Truth-Layer).
+  - Vitest in `infra/` eingerichtet, 7 Assertion-Tests gegen das synthetisierte Template (KeySchema, Billing, TTL, Stream, Removal, Resource-Count, Phase-Tag).
+- **Verify:** `pnpm -F @f1/infra test` → 7 pass. `pnpm -r test` insgesamt 44 grün.
+- **Stolperfalle:** TableV2 nested die Tags pro Replica (`Replicas[*].Tags`), nicht auf Root-Level wie bei TableV1.
 
 ## T6 — SQS Queue + DLQ
 

@@ -8,6 +8,15 @@
  * cause silent reads-that-find-nothing, which is the worst failure mode.
  */
 
+/**
+ * Attribute names of the Single-Table. The CDK stack (T5) declares these,
+ * the Consumer lambda (T8) reads/writes them — keep them in one place so
+ * a rename can't drift across the codebase.
+ */
+export const PK_ATTR = "PK" as const;
+export const SK_ATTR = "SK" as const;
+export const TTL_ATTR = "expiresAt" as const;
+
 export const PK_PREFIX = "session" as const;
 
 export function sessionPK(sessionId: string): string {

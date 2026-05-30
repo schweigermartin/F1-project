@@ -46,10 +46,10 @@ Reihenfolge bewusst: Schemas → Stacks → Lambdas → Wiring → Live-Test.
 - **Verify:** `pnpm -F @f1/infra test` → 7 pass. `pnpm -r test` insgesamt 44 grün.
 - **Stolperfalle:** TableV2 nested die Tags pro Replica (`Replicas[*].Tags`), nicht auf Root-Level wie bei TableV1.
 
-## T6 — SQS Queue + DLQ
+## T6 — SQS Queue + DLQ — DONE
 
-- **Output:** Standard-Queue + DLQ, Redrive Policy MaxReceiveCount=3, Visibility Timeout 60s, Retention 1d / 7d.
-- **Verify:** Snapshot-Test.
+- **Output:** `EventsQueue` (Standard, 1d retention, 60s visibility timeout, enforceSSL) + `EventsQueueDLQ` (7d retention, enforceSSL). Redrive: `maxReceiveCount=3`. Beide queueNamed (`F1-Events`, `F1-Events-DLQ`).
+- **Verify:** 5 neue Assertion-Tests in `pipeline-stack.test.ts` — Queue-Count, Namen, Retention, Visibility, Redrive-Policy, TLS-Deny via SQS-QueuePolicy. 12 infra tests grün, 49 total.
 
 ## T7 — Poller Lambda (Code + Tests)
 

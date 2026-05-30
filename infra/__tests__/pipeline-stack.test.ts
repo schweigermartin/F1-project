@@ -85,3 +85,50 @@ describe("PipelineStack — F1LiveTable", () => {
     });
   });
 });
+
+describe("PipelineStack — SQS EventsQueue + DLQ", () => {
+  it("creates exactly two SQS queues (main + DLQ)", () => {
+    synth().resourceCountIs("AWS::SQS::Queue", 2);
+  });
+
+  it("DLQ is named F1-Events-DLQ with 7 day retention", () => {
+    synth().hasResourceProperties("AWS::SQS::Queue", {
+      QueueName: "F1-Events-DLQ",
+      MessageRetentionPeriod: 7 * 24 * 60 * 60,
+    });
+  });
+
+  it("main queue has 1 day retention and 60s visibility timeout", () => {
+    synth().hasResourceProperties("AWS::SQS::Queue", {
+      QueueName: "F1-Events",
+      MessageRetentionPeriod: 24 * 60 * 60,
+      VisibilityTimeout: 60,
+    });
+  });
+
+  it("main queue redrives to the DLQ after 3 failed attempts", () => {
+    synth().hasResourceProperties("AWS::SQS::Queue", {
+      QueueName: "F1-Events",
+      RedrivePolicy: Match.objectLike({
+        maxReceiveCount: 3,
+        deadLetterTargetArn: Match.anyValue(),
+      }),
+    });
+  });
+
+  it("both queues deny non-TLS traffic via bucket-policy-style rule", () => {
+    const t = synth();
+    // enforceSSL adds an AWS::SQS::QueuePolicy with a Deny on aws:SecureTransport=false.
+    t.resourceCountIs("AWS::SQS::QueuePolicy", 2);
+    t.hasResourceProperties("AWS::SQS::QueuePolicy", {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Effect: "Deny",
+            Condition: { Bool: { "aws:SecureTransport": "false" } },
+          }),
+        ]),
+      }),
+    });
+  });
+});

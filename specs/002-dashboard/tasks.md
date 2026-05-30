@@ -108,10 +108,14 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Verify:** 5 pure Format-Tests (Ordering nulls-last, Gap-/LapTime-Format, Reifen-Mapping, gapChartData inkl. lapped-an-max) → **18 dashboard-Tests grün**. `build`/`typecheck` + Root-`lint`/`format` grün. Komponenten alle < 100 Zeilen.
 - **Notes:** **Abweichung vom Plan:** statt „PositionChart (Position über Runden)" ein **GapChart** — der Store hält nur den aktuellen Zustand, keine Per-Runden-Historie; der Gap-Balken ist datentreu aus dem Modell (Per-Runden-Verlauf bräuchte einen History-Buffer → mögliche spätere Erweiterung). **Build-Fallstrick:** Turbopack rewritet NodeNext-`.js`-Endungen in `@f1/shared`-Source nicht → Build auf webpack + `resolve.extensionAlias` umgestellt (`next build --webpack`).
 
-### T12 — Replay-UI
+### T12 — Replay-UI — DONE
 
-- **Output:** `ReplayControls`: Toggle Live↔Replay, Session-Auswahl (archivierte Sessions), Speed 1×/2×/4×, sendet `replay:start`/`replay:stop`. „No live session" → schlägt Replay vor (AC-2/US-3).
-- **Verify:** Gegen deployte Backend-Preview: Replay einer archivierten Session läuft chronologisch + speed-skaliert (AC-5).
+- **Output:**
+  - `ReplayControls` (`'use client'`): Session-ID-Eingabe, Speed-Buttons 1×/2×/4×, Start/Stop (umgeschaltet über `mode`), `aria`-Labels. Bei `noLiveSession` Hinweis „replay an archived one" (AC-2/US-3). Ruft die aus T10 bereitstehenden `startReplay`/`stopReplay` des Hooks.
+  - `Dashboard` verdrahtet: `const controls = useRaceSocket()`, `noLiveSession`-Selektor, `ReplayControls` unter dem WeatherStrip.
+  - Pure `buildReplayStart(input, speed)` (trim + non-empty-Validierung) + `REPLAY_SPEEDS` in `src/lib/replay.ts`, getrennt von der Komponente.
+- **Verify:** 3 pure Tests (trim/valid, leer/whitespace abgelehnt, Speeds = [1,2,4]) → **21 dashboard-Tests grün**. `build`/`typecheck` + Root-`lint`/`format` grün.
+- **Notes:** Session-Auswahl ist vorerst eine Texteingabe (kein „archivierte Sessions auflisten"-Endpoint im Backend) — ein S3-List-Endpoint wäre eine spätere Erweiterung. Chronologie/Speed-Skalierung des eigentlichen Replays sind backend-seitig in T6 abgedeckt + getestet; End-to-End-Beleg kommt mit T14-Deploy + T15-E2E.
 
 ### T13 — Observability (Realtime)
 

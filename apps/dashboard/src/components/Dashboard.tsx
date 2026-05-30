@@ -8,6 +8,7 @@ import { gapChartData, sortedDrivers } from "../lib/format";
 import { useRaceStore } from "../store/race-store";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { GapChart } from "./GapChart";
+import { ReplayControls } from "./ReplayControls";
 import { TimingTower } from "./TimingTower";
 import { WeatherStrip } from "./WeatherStrip";
 
@@ -19,12 +20,13 @@ const Card = ({ children, title }: { children: ReactNode; title: string }): Reac
 );
 
 export function Dashboard(): ReactNode {
-  useRaceSocket();
+  const controls = useRaceSocket();
 
   const drivers = useRaceStore((s) => s.drivers);
   const weather = useRaceStore((s) => s.weather);
   const connection = useRaceStore((s) => s.connection);
   const mode = useRaceStore((s) => s.mode);
+  const noLiveSession = useRaceStore((s) => s.noLiveSession);
 
   // Seed canned data when there's no backend configured, so the dashboard is
   // never blank locally / in a preview without a deployed WS API.
@@ -53,6 +55,15 @@ export function Dashboard(): ReactNode {
       </header>
 
       <WeatherStrip weather={weather} />
+
+      <div style={{ marginTop: "1rem" }}>
+        <ReplayControls
+          mode={mode}
+          noLiveSession={noLiveSession}
+          onStart={controls.startReplay}
+          onStop={controls.stopReplay}
+        />
+      </div>
 
       <div
         style={{

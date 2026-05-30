@@ -61,37 +61,38 @@ Reihenfolge bewusst: Schemas → Stacks → Lambdas → Wiring → Live-Test.
 - **Verify:** 24 infra tests + 37 shared = **61 total**, alle grün.
 - **ESLint:** `no-console: off` für `infra/lambda/**` — Lambdas loggen idiomatisch via `console.log` nach CloudWatch.
 
-## T8 — Consumer Lambda (Code + Tests)
+## T8 — Consumer Lambda (Code + Tests) — DONE
 
-- **Output:** `infra/lambda/consumer/index.ts` mit Logik aus Plan §5. DDB-Writes per Document Client, S3-PutObject pro Tick. Unit-Tests mit gemockten AWS-SDKs.
-- **Verify:** Tests grün. Schema-Fail führt zu Item in Batch-Item-Failures (SQS-Konvention).
+- **Output:** `handler.ts` (pure DI) + `index.ts` (real AWS clients). Pro Batch: Envelope + per-Endpoint Validation → `rowToSK()` aus `@f1/shared` zur DDB-Item-Construction → BatchWriteItem-Chunks zu 25 → ein S3-Part pro Batch unter `raw/sessions/<date>/<session>/parts/`. `reportBatchItemFailures: true` für SQS Partial-Batch-Retry.
+- **Verify:** 13 neue Tests — Happy Path, TTL, EventsArchived-Metric, Envelope+Payload Schema-Fails, Wrong schema_version, Non-JSON, Unroutable Rows (stint#xx#nn), DDB/S3 throws.
 
-## T9 — Archiver Lambda (Code + Tests)
+## T9 — Archiver Lambda (Code + Tests) — DONE
 
-- **Output:** `infra/lambda/archiver/index.ts` — listet Parts, sortiert, merged, schreibt finale JSONL, löscht Parts. Idempotent.
-- **Verify:** Test: zwei Aufrufe nacheinander → zweiter Aufruf macht nichts (kein Duplikat).
+- **Output:** `handler.ts` (pure DI) + `index.ts` (S3 list/head/get/put/delete). Pro Session-Folder: skippt wenn Finale schon existiert (Idempotenz), skippt wenn newest part < 30 Min alt (still active), sonst merged alle Parts sortiert nach `fetched_at + endpoint` zur finalen JSONL und löscht Parts. Robust gegen unparseable Lines.
+- **Verify:** 5 Tests — Happy-Path-Merge mit Order, Skip-Existing, Skip-Still-Active, No-Parts, Malformed-Line-Tolerance. Trigger: `events.Rule rate(15 min)`.
 
-## T10 — Schedule-Sync Lambda (Code + Tests)
+## T10 — Schedule-Sync Lambda (Code + Tests) — DONE
 
-- **Output:** `infra/lambda/scheduleSync/index.ts` — fetcht OpenF1 `sessions`, konvertiert zu Scheduler-Windows, programmiert `aws-scheduler` Schedules.
-- **Verify:** Unit-Test mit Fixture-Sessions: korrekte Anzahl Schedules, Zeitfenster ±15/+30 Min.
+- **Output:** `handler.ts` (pure DI) + `index.ts` (`@aws-sdk/client-scheduler`). Täglich um 04:00 UTC: fetch `/sessions?year=<current>`, filter cancelled + outside 48h horizon, upsert pro Session ein `f1-poll-<key>`-Schedule mit Window `[start-15min, end+30min]` und Target = Poller-Lambda (eigene IAM-Rolle für scheduler.amazonaws.com). Sweep stale schedules, aber nie eines löschen das gerade läuft.
+- **Verify:** 7 Tests — Horizon-Filter, Cancelled-Skip, Completed-Skip, Cleanup-Stale, Never-Delete-Running, Bad-Response-Tolerance, Schema-Fail per Row.
 
-## T11 — Wiring: Lambdas in Stack einhängen
+## T11 — Wiring: Lambdas in Stack einhängen — DONE
 
-- **Output:** Alle Lambdas im Stack: Code-Asset gebaut (esbuild), Permissions (Plan §Security), SQS-EventSource für Consumer, EventBridge-Rule → Poller, EventBridge-Schedule → Archiver, Cron → Schedule-Sync.
-- **Verify:** `cdk synth` zeigt vollständigen Stack mit allen Verbindungen. Snapshot-Test.
+- **Output:** Alle 4 Lambdas als `NodejsFunction` (ESM, ARM64, esbuild bündelt, `@aws-sdk/*` extern weil Runtime-provided). Consumer hat SqsEventSource (Batch 10, MaxBatching 5s, partial failures). Archiver hängt an `Schedule.rate(15min)`. Schedule-Sync auf `cron 04:00 UTC`. Least-privilege Grants: `eventsQueue.grantSendMessages(poller)`, `liveTable.grantWriteData(consumer)`, `dataBucket.grantPut(consumer, "raw/sessions/*/parts/*")`, `dataBucket.grantReadWrite(archiver, ...)`, scheduler-invoke role mit `lambda:InvokeFunction` auf Poller, scheduleSync mit `scheduler:*` + `iam:PassRole`.
+- **Verify:** `cdk synth` grün, alle 47 infra-Tests (inkl. T5+T6) bleiben grün.
 
-## T12 — Integrationstest mit LocalStack
+## T12 — Integrationstest — DONE (Plan-B: pures Mocking)
 
-- **Output:** `infra/__tests__/pipeline.integration.test.ts` — startet LocalStack, deployed (oder mocked) Pipeline, schickt Fixture-Events durch, assert Endzustand in DDB + S3.
-- **Verify:** `pnpm -F infra test` grün.
-- **Notes:** Wenn LocalStack zu schwer wird → Plan-B: pures Mocking mit aws-sdk-client-mock.
+- **Output:** `infra/__tests__/pipeline.integration.test.ts` — Poller → in-memory SQS → Consumer → in-memory DDB/S3 → Archiver, **mit echten Fixtures aus T3**. End-Assertions: 5 SQS-Messages, korrekte DDB-Items (PK `session#11291`, weather-Singleton, lap-SKs zero-padded), 1 S3-Part mit 5 JSONL-Zeilen, Archiver konsolidiert chronologisch sortiert, Parts werden gelöscht.
+- **Verify:** Test grün. Beweist End-to-End-Determinismus ohne LocalStack-Overhead.
 
-## T13 — CloudWatch Dashboard + Alarme
+## T13 — CloudWatch Dashboard + Alarme — DONE
 
-- **Output:** Dashboard `f1-pipeline` als CDK-Code, 4 Alarme aus Plan §Observability, SNS-Topic `f1-alerts` mit Email-Subscription.
-- **Verify:** `cdk synth` enthält alle. Email-Subscription nach Deploy bestätigen.
-- **Constitution:** VIII.
+- **Output:**
+  - SNS-Topic `f1-alerts` mit Email-Subscription auf `martin_schweiger@outlook.de`.
+  - 4 Alarme: `F1-DLQ-Depth` (>0), `F1-Poller-ErrorRate` (>5% via MathExpression), `F1-Consumer-ErrorRate` (>5%), `F1-ScheduleSync-Failure` (>0 errors in 15 min). Alle melden an SNS.
+  - Dashboard `f1-pipeline` mit 4 Widgets: SQS-Tiefe (events vs DLQ rot), Lambda-Invocations aller 4, Lambda-Errors farbcodiert, DDB-Consumed-Capacity.
+- **Verify:** `cdk synth` grün. Email-Subscription muss nach T14-Deploy in der Mail bestätigt werden (Plan §Notification).
 
 ## T14 — Deploy in `eu-central-1`
 

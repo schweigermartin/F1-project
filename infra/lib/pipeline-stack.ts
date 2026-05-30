@@ -1,15 +1,28 @@
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { PK_ATTR, SK_ATTR, TTL_ATTR } from "@f1/shared";
 import { Duration, RemovalPolicy, Stack, type StackProps, Tags } from "aws-cdk-lib";
+import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
+import * as cwActions from "aws-cdk-lib/aws-cloudwatch-actions";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as events from "aws-cdk-lib/aws-events";
+import * as targets from "aws-cdk-lib/aws-events-targets";
+import * as iam from "aws-cdk-lib/aws-iam";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
+import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
+import * as logs from "aws-cdk-lib/aws-logs";
 import { type IBucket } from "aws-cdk-lib/aws-s3";
+import * as sns from "aws-cdk-lib/aws-sns";
+import * as snsSubs from "aws-cdk-lib/aws-sns-subscriptions";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import { type Construct } from "constructs";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const lambdaDir = (sub: string): string => path.resolve(__dirname, "..", "lambda", sub);
+
 export interface PipelineStackProps extends StackProps {
-  /**
-   * Cross-stack reference to the shared data bucket from DataLayerStack.
-   * Consumer (T8) writes parts here; Archiver (T9) reads + consolidates.
-   */
   readonly dataBucket: IBucket;
 }
 
@@ -18,20 +31,26 @@ export interface PipelineStackProps extends StackProps {
  *   EventBridge → Poller λ → SQS+DLQ → Consumer λ → DDB + S3 parts → Archiver λ
  *   plus a daily Schedule-Sync λ that opens/closes the polling window per session.
  *
- * Filled across T5–T11; current contents:
+ * Filled across T5–T13; current contents:
  *   T5 ✓ — F1LiveTable (Single-Table, TTL, Streams, On-Demand)
- *   T6 ✓ — EventsQueue + EventsQueueDLQ (Standard, redrive, enforceSSL)
- *   T7 — Poller λ
- *   T8 — Consumer λ
- *   T9 — Archiver λ
- *   T10 — Schedule-Sync λ
- *   T11 — wiring (EventSources, EventBridge rules, IAM, CloudWatch)
+ *   T6 ✓ — EventsQueue + EventsQueueDLQ
+ *   T7 ✓ — Poller λ source
+ *   T8 ✓ — Consumer λ source
+ *   T9 ✓ — Archiver λ source
+ *   T10 ✓ — Schedule-Sync λ source
+ *   T11 ✓ — wiring: NodejsFunction bundling, EventSources, EventBridge, IAM
+ *   T13 — CloudWatch dashboard + alarms
  */
 export class PipelineStack extends Stack {
   readonly dataBucket: IBucket;
   readonly liveTable: dynamodb.TableV2;
   readonly eventsQueue: sqs.Queue;
   readonly eventsDlq: sqs.Queue;
+  readonly pollerFn: lambda.IFunction;
+  readonly consumerFn: lambda.IFunction;
+  readonly archiverFn: lambda.IFunction;
+  readonly scheduleSyncFn: lambda.IFunction;
+  readonly schedulerInvokeRole: iam.Role;
 
   constructor(scope: Construct, id: string, props: PipelineStackProps) {
     super(scope, id, props);
@@ -40,9 +59,6 @@ export class PipelineStack extends Stack {
     this.dataBucket = props.dataBucket;
 
     // ─── SQS + DLQ ────────────────────────────────────────────────────────
-    // Standard queue, not FIFO: ordering is reconstructed by the Archiver
-    // when it sorts S3 parts by `fetched_at` (plan §5). FIFO would cap
-    // throughput and cost more, with no benefit here.
     this.eventsDlq = new sqs.Queue(this, "EventsQueueDLQ", {
       queueName: "F1-Events-DLQ",
       retentionPeriod: Duration.days(7),
@@ -52,34 +68,255 @@ export class PipelineStack extends Stack {
     this.eventsQueue = new sqs.Queue(this, "EventsQueue", {
       queueName: "F1-Events",
       retentionPeriod: Duration.days(1),
-      // 60s = ~6× Consumer-Lambda timeout (10s). Plenty of headroom for the
-      // SQS partial-batch retry pattern (T8) without blocking too long.
       visibilityTimeout: Duration.seconds(60),
       enforceSSL: true,
-      deadLetterQueue: {
-        queue: this.eventsDlq,
-        // 3 attempts: enough to ride out transient DDB throttling, low
-        // enough that a poison message lands in DLQ within seconds.
-        maxReceiveCount: 3,
-      },
+      deadLetterQueue: { queue: this.eventsDlq, maxReceiveCount: 3 },
     });
 
+    // ─── DynamoDB Single-Table ────────────────────────────────────────────
     this.liveTable = new dynamodb.TableV2(this, "F1LiveTable", {
       tableName: "F1Live",
       partitionKey: { name: PK_ATTR, type: dynamodb.AttributeType.STRING },
       sortKey: { name: SK_ATTR, type: dynamodb.AttributeType.STRING },
-      // PAY_PER_REQUEST on TableV2 is the L2 default ("billing.onDemand()")
       billing: dynamodb.Billing.onDemand(),
-      // TTL: epoch-seconds attribute; expired items auto-evicted within 48h.
       timeToLiveAttribute: TTL_ATTR,
-      // Streams feed Phase 2's WebSocket push: both images so the dashboard
-      // can render a useful delta (e.g. "P3 → P2 for #16").
       dynamoStream: dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
-      // DESTROY: live state is ephemeral by design (TTL 24h) and S3 archive is
-      // the durable copy. Stack tear-down should drop the table cleanly.
       removalPolicy: RemovalPolicy.DESTROY,
-      // Point-in-time recovery off — cost-bearing and we have S3 as truth.
       pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: false },
+    });
+
+    // ─── Lambda baseline ──────────────────────────────────────────────────
+    const lambdaDefaults = {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      architecture: lambda.Architecture.ARM_64,
+      logRetention: logs.RetentionDays.TWO_WEEKS,
+      bundling: {
+        format: OutputFormat.ESM,
+        target: "node20",
+        // The Lambda runtime ships AWS SDK v3, so don't bundle it.
+        externalModules: ["@aws-sdk/*"] as string[],
+      },
+    };
+
+    // ─── Poller λ ─────────────────────────────────────────────────────────
+    this.pollerFn = new NodejsFunction(this, "PollerFn", {
+      functionName: "F1-Poller",
+      entry: path.join(lambdaDir("poller"), "index.ts"),
+      handler: "handler",
+      ...lambdaDefaults,
+      memorySize: 256,
+      timeout: Duration.seconds(10),
+      environment: { EVENTS_QUEUE_URL: this.eventsQueue.queueUrl },
+    });
+    this.eventsQueue.grantSendMessages(this.pollerFn);
+
+    // ─── Consumer λ ───────────────────────────────────────────────────────
+    this.consumerFn = new NodejsFunction(this, "ConsumerFn", {
+      functionName: "F1-Consumer",
+      entry: path.join(lambdaDir("consumer"), "index.ts"),
+      handler: "handler",
+      ...lambdaDefaults,
+      memorySize: 512,
+      timeout: Duration.seconds(30),
+      environment: {
+        LIVE_TABLE_NAME: this.liveTable.tableName,
+        DATA_BUCKET_NAME: this.dataBucket.bucketName,
+      },
+    });
+    this.consumerFn.addEventSource(
+      new SqsEventSource(this.eventsQueue, {
+        batchSize: 10,
+        maxBatchingWindow: Duration.seconds(5),
+        reportBatchItemFailures: true,
+      }),
+    );
+    this.liveTable.grantWriteData(this.consumerFn);
+    this.dataBucket.grantPut(this.consumerFn, "raw/sessions/*/parts/*");
+
+    // ─── Archiver λ ───────────────────────────────────────────────────────
+    this.archiverFn = new NodejsFunction(this, "ArchiverFn", {
+      functionName: "F1-Archiver",
+      entry: path.join(lambdaDir("archiver"), "index.ts"),
+      handler: "handler",
+      ...lambdaDefaults,
+      memorySize: 512,
+      timeout: Duration.minutes(5),
+      environment: { DATA_BUCKET_NAME: this.dataBucket.bucketName },
+    });
+    this.dataBucket.grantReadWrite(this.archiverFn, "raw/sessions/*");
+    this.dataBucket.grantDelete(this.archiverFn, "raw/sessions/*/parts/*");
+    new events.Rule(this, "ArchiverSchedule", {
+      schedule: events.Schedule.rate(Duration.minutes(15)),
+      targets: [new targets.LambdaFunction(this.archiverFn)],
+    });
+
+    // ─── Schedule-Sync λ ─────────────────────────────────────────────────
+    // Scheduler-invoke role: aws-scheduler assumes this to invoke the Poller.
+    this.schedulerInvokeRole = new iam.Role(this, "SchedulerInvokeRole", {
+      roleName: "F1-Scheduler-InvokePoller",
+      assumedBy: new iam.ServicePrincipal("scheduler.amazonaws.com"),
+      inlinePolicies: {
+        InvokePoller: new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              actions: ["lambda:InvokeFunction"],
+              resources: [this.pollerFn.functionArn],
+            }),
+          ],
+        }),
+      },
+    });
+
+    this.scheduleSyncFn = new NodejsFunction(this, "ScheduleSyncFn", {
+      functionName: "F1-ScheduleSync",
+      entry: path.join(lambdaDir("schedule-sync"), "index.ts"),
+      handler: "handler",
+      ...lambdaDefaults,
+      memorySize: 256,
+      timeout: Duration.minutes(1),
+      environment: {
+        POLLER_FUNCTION_ARN: this.pollerFn.functionArn,
+        SCHEDULER_ROLE_ARN: this.schedulerInvokeRole.roleArn,
+      },
+    });
+    // Manage f1-poll-* schedules; pass the invoke role to scheduler.
+    this.scheduleSyncFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "scheduler:CreateSchedule",
+          "scheduler:UpdateSchedule",
+          "scheduler:DeleteSchedule",
+          "scheduler:GetSchedule",
+          "scheduler:ListSchedules",
+        ],
+        resources: ["*"], // aws-scheduler resource ARNs are dynamic; limit by name-prefix at the IAM level isn't supported directly.
+      }),
+    );
+    this.scheduleSyncFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["iam:PassRole"],
+        resources: [this.schedulerInvokeRole.roleArn],
+      }),
+    );
+    new events.Rule(this, "ScheduleSyncDailyCron", {
+      // 04:00 UTC daily — pulls the year's sessions, schedules the next 48h.
+      schedule: events.Schedule.cron({ minute: "0", hour: "4" }),
+      targets: [new targets.LambdaFunction(this.scheduleSyncFn)],
+    });
+
+    // ─── Alerts (SNS) + Alarms ────────────────────────────────────────────
+    const alertTopic = new sns.Topic(this, "AlertTopic", {
+      topicName: "f1-alerts",
+      displayName: "F1 Pipeline Alerts",
+    });
+    alertTopic.addSubscription(new snsSubs.EmailSubscription("martin_schweiger@outlook.de"));
+    const alertAction = new cwActions.SnsAction(alertTopic);
+
+    // DLQ-depth: any message in the DLQ is a real problem.
+    new cloudwatch.Alarm(this, "DLQDepthAlarm", {
+      alarmName: "F1-DLQ-Depth",
+      metric: this.eventsDlq.metricApproximateNumberOfMessagesVisible({
+        period: Duration.minutes(5),
+        statistic: "Maximum",
+      }),
+      threshold: 0,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
+    // Poller error rate: >5% errored invocations over 5 min.
+    new cloudwatch.Alarm(this, "PollerErrorRateAlarm", {
+      alarmName: "F1-Poller-ErrorRate",
+      metric: new cloudwatch.MathExpression({
+        expression: "errors / IF(invocations > 0, invocations, 1) * 100",
+        usingMetrics: {
+          errors: this.pollerFn.metricErrors({ period: Duration.minutes(5) }),
+          invocations: this.pollerFn.metricInvocations({ period: Duration.minutes(5) }),
+        },
+        period: Duration.minutes(5),
+      }),
+      threshold: 5,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
+    // Schedule-sync failed: this lambda runs once a day; a single error
+    // means tomorrow's race-weekend won't be polled.
+    new cloudwatch.Alarm(this, "ScheduleSyncFailureAlarm", {
+      alarmName: "F1-ScheduleSync-Failure",
+      metric: this.scheduleSyncFn.metricErrors({ period: Duration.minutes(15) }),
+      threshold: 0,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
+    // Consumer error rate.
+    new cloudwatch.Alarm(this, "ConsumerErrorRateAlarm", {
+      alarmName: "F1-Consumer-ErrorRate",
+      metric: new cloudwatch.MathExpression({
+        expression: "errors / IF(invocations > 0, invocations, 1) * 100",
+        usingMetrics: {
+          errors: this.consumerFn.metricErrors({ period: Duration.minutes(5) }),
+          invocations: this.consumerFn.metricInvocations({ period: Duration.minutes(5) }),
+        },
+        period: Duration.minutes(5),
+      }),
+      threshold: 5,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
+    // ─── Dashboard ────────────────────────────────────────────────────────
+    new cloudwatch.Dashboard(this, "PipelineDashboard", {
+      dashboardName: "f1-pipeline",
+      widgets: [
+        [
+          new cloudwatch.GraphWidget({
+            title: "SQS depth (Events vs DLQ)",
+            left: [
+              this.eventsQueue.metricApproximateNumberOfMessagesVisible(),
+              this.eventsDlq.metricApproximateNumberOfMessagesVisible({
+                color: cloudwatch.Color.RED,
+              }),
+            ],
+            width: 12,
+          }),
+          new cloudwatch.GraphWidget({
+            title: "Lambda invocations",
+            left: [
+              this.pollerFn.metricInvocations(),
+              this.consumerFn.metricInvocations(),
+              this.archiverFn.metricInvocations(),
+              this.scheduleSyncFn.metricInvocations(),
+            ],
+            width: 12,
+          }),
+        ],
+        [
+          new cloudwatch.GraphWidget({
+            title: "Lambda errors",
+            left: [
+              this.pollerFn.metricErrors({ color: cloudwatch.Color.RED }),
+              this.consumerFn.metricErrors({ color: cloudwatch.Color.ORANGE }),
+              this.archiverFn.metricErrors(),
+              this.scheduleSyncFn.metricErrors(),
+            ],
+            width: 12,
+          }),
+          new cloudwatch.GraphWidget({
+            title: "DDB consumed capacity (writes + reads)",
+            left: [
+              this.liveTable.metricConsumedWriteCapacityUnits(),
+              this.liveTable.metricConsumedReadCapacityUnits(),
+            ],
+            width: 12,
+          }),
+        ],
+      ],
     });
   }
 }

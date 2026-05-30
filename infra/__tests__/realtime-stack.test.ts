@@ -97,10 +97,11 @@ describe("RealtimeStack — WebSocket API", () => {
     });
   });
 
-  it("wires $connect and $disconnect routes", () => {
+  it("wires $connect, $disconnect and subscribe routes", () => {
     const t = synth();
     t.hasResourceProperties("AWS::ApiGatewayV2::Route", { RouteKey: "$connect" });
     t.hasResourceProperties("AWS::ApiGatewayV2::Route", { RouteKey: "$disconnect" });
+    t.hasResourceProperties("AWS::ApiGatewayV2::Route", { RouteKey: "subscribe" });
   });
 
   it("deploys an auto-deploy 'live' stage", () => {
@@ -123,6 +124,16 @@ describe("RealtimeStack — WebSocket API", () => {
       PolicyDocument: Match.objectLike({
         Statement: Match.arrayWith([
           Match.objectLike({ Action: "dynamodb:DeleteItem", Effect: "Allow" }),
+        ]),
+      }),
+    });
+  });
+
+  it("lets subscribe manage WebSocket connections (PostToConnection)", () => {
+    synth().hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({ Action: "execute-api:ManageConnections", Effect: "Allow" }),
         ]),
       }),
     });

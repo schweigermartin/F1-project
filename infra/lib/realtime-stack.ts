@@ -52,6 +52,7 @@ export class RealtimeStack extends Stack {
   readonly webSocketStage: WebSocketStage;
   readonly connectFn: lambda.IFunction;
   readonly disconnectFn: lambda.IFunction;
+  readonly subscribeFn: lambda.IFunction;
 
   constructor(scope: Construct, id: string, props: RealtimeStackProps) {
     super(scope, id, props);
@@ -139,6 +140,35 @@ export class RealtimeStack extends Stack {
       webSocketApi: this.webSocketApi,
       stageName: "live",
       autoDeploy: true,
+    });
+
+    // ─── Subscribe λ ──────────────────────────────────────────────────────
+    // Resolves the session, records the subscription, and posts the initial
+    // snapshot built from F1Live state.
+    this.subscribeFn = new NodejsFunction(this, "WsSubscribeFn", {
+      functionName: "F1-WS-Subscribe",
+      entry: path.join(lambdaDir("ws-subscribe"), "index.ts"),
+      handler: "handler",
+      ...lambdaDefaults,
+      memorySize: 512,
+      environment: {
+        CONNECTIONS_TABLE_NAME: this.connectionsTable.tableName,
+        LIVE_TABLE_NAME: this.liveTable.tableName,
+      },
+    });
+    // Read-only on the live data; only updates its own connection row.
+    this.liveTable.grantReadData(this.subscribeFn);
+    this.subscribeFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:UpdateItem"],
+        resources: [this.connectionsTable.tableArn],
+      }),
+    );
+    // PostToConnection back to the subscriber.
+    this.webSocketApi.grantManageConnections(this.subscribeFn);
+
+    this.webSocketApi.addRoute("subscribe", {
+      integration: new WebSocketLambdaIntegration("SubscribeIntegration", this.subscribeFn),
     });
   }
 }

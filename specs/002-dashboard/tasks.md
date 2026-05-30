@@ -39,10 +39,14 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Verify:** 6 Handler-Unit-Tests (Item-Shape, TTL, single Put/Delete, DDB-Fehler-Propagation) + 4 Stack-Assertions (WEBSOCKET-API, `$connect`/`$disconnect`-Routen, auto-deploy-Stage, scoped IAM) → **64 infra-Tests grün**. `cdk synth F1-Realtime` + typecheck/lint/format grün.
 - **Notes:** `$connect`-Authorizer kommt in T8; custom Routen (subscribe/replay) in T4/T6.
 
-### T4 — Subscribe-Route + Snapshot aus DDB
+### T4 — Subscribe-Route + Snapshot aus DDB — DONE
 
-- **Output:** Route `subscribe`. `subscribe λ`: resolved aktive Session (`F1Live` `meta` + `isSessionActive`) wenn `session_id` fehlt, schreibt `connectionId → session_id`, baut `snapshot` (Fahrer-Aggregat + Wetter) aus DDB-Query und postet ihn (gechunkt wenn > 128 KB). `no-live-session`-`info` als Fallback.
-- **Verify:** Unit — Snapshot-Aggregation aus Fixture-DDB-Items, Chunking-Grenze, Fallback ohne aktive Session. Mock-`PostToConnection`.
+- **Output:**
+  - Route `subscribe` + `ws-subscribe λ` (`handler.ts` pure DI + `index.ts`).
+  - `buildSnapshot(items)` faltet die flachen F1Live-Items (`{PK,SK,expiresAt,endpoint,...row}`) zu einer `DriverState` je Fahrer (Position/Gap/Interval + jeweils **letzter** Stint→Compound/Reifenalter und **letzte** Runde→Dauer) + Wetter, sortiert nach Position. `buildSnapshotMessages(...)` chunked auf `MAX_FRAME_BYTES` (120 KB, R-1) — Common Case = ein Frame ohne `part`, Wetter nur auf Frame 1.
+  - `index.ts`: `resolveActiveSessionId` (Scan F1Live, Session mit jüngster TTL) wenn `session_id` fehlt, `setSubscription` (UpdateItem `session_id` auf der Conn-Row), `querySession` (Query `PK=session#<id>`), `post` via `ApiGatewayManagementApi.PostToConnection` (Endpoint aus `requestContext.domainName/stage`). Inbound via `SubscribeMessageSchema` validiert (Constitution VI) → `error`-Frame bei Müll. Kein aktive Session → `info:no-live-session`.
+  - IAM: `liveTable.grantReadData`, `dynamodb:UpdateItem` auf Connections, `grantManageConnections`. Neue Dependency `@aws-sdk/client-apigatewaymanagementapi`.
+- **Verify:** 11 Unit-Tests (Aggregation aus Fixture-Items: latest-stint/latest-lap/position/interval/weather-strip/no-driver-skip; Chunking 1-Frame vs. parted; explizite vs. resolvte Session; `no-live-session`-Fallback) + 2 Stack-Assertions (subscribe-Route, ManageConnections) → **76 infra-Tests grün**. `cdk synth` + typecheck/lint/format grün.
 
 ### T5 — Fanout-Lambda (DDB-Stream → delta)
 

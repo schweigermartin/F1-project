@@ -24,10 +24,13 @@ Reihenfolge bewusst: Schemas → Stacks → Lambdas → Wiring → Live-Test.
 - **Verify:** `pnpm -F @f1/shared test` → 31 pass. `pnpm typecheck` grün (Tests sind jetzt auch im tsc-Scope durch `rootDir: "."`).
 - **CI:** Test-Step im `ts`-Job hinzugefügt.
 
-## T3 — Fixture-Sammlung
+## T3 — Fixture-Sammlung — DONE
 
-- **Output:** `ml/fixtures/openf1/<session_key>/<endpoint>.json` pro Endpoint einer historischen Session (z.B. Bahrain Race 2024). Skript `ml/scripts/fetch_fixtures.py` zum Reproduzieren.
-- **Verify:** Fixtures validieren gegen die T2-Schemas.
+- **Output:**
+  - `ml/scripts/fetch_fixtures.py` — pure Python (stdlib + optional certifi), auto-detects latest race wenn `--session` weggelassen, samplet `position/intervals/laps` auf 100 Rows (`--full` für unsampled).
+  - `ml/fixtures/openf1/11291/{session,position,intervals,laps,stints,weather}.json` (172 KB total — Montréal Race 2026-05-24).
+  - `packages/shared/__tests__/fixtures.test.ts` — validiert alle 6 Files gegen die T2-Schemas, läuft in CI.
+- **Verify:** 37 Tests grün. Ein echter Schema-Drift wurde entdeckt + gefixt: `segments_sector_*` enthält `null`-Einträge IM Array, nicht nur als ganzer Wert (in `openf1-notes.md` dokumentiert).
 
 ## T4 — CDK `PipelineStack` Skelett
 

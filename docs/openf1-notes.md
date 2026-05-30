@@ -102,6 +102,7 @@
 
 - **Wichtig:** viele Felder sind in der ersten Runde `null` (z.B. `lap_duration` weil sie noch läuft). Schema muss das tolerieren — `z.number().nullable()`, nicht `z.number()`.
 - `segments_sector_*` sind Mini-Sektor-Codes (Mini-Sectors). `2048` ≈ "neutral/keine Daten".
+- **In T3 nachträglich entdeckt:** `segments_sector_*` enthält **`null`-Einträge IM Array** (nicht nur als ganzer Wert). Schema muss `z.array(z.number().int().nullable())` sein, sonst fliegen Live-Laps raus. Genau dafür war der Fixture-Validation-Test gut.
 
 ### `/stints?session_key=11291`
 

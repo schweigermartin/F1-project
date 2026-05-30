@@ -83,9 +83,10 @@ export const LapSchema = z.object({
   st_speed: z.number().nullable().optional(), // not always present
   is_pit_out_lap: z.boolean(),
   lap_duration: z.number().nullable(),
-  segments_sector_1: z.array(z.number().int()).nullable().optional(),
-  segments_sector_2: z.array(z.number().int()).nullable().optional(),
-  segments_sector_3: z.array(z.number().int()).nullable().optional(),
+  // Mini-sector codes; individual entries are null while a lap is in progress.
+  segments_sector_1: z.array(z.number().int().nullable()).nullable().optional(),
+  segments_sector_2: z.array(z.number().int().nullable()).nullable().optional(),
+  segments_sector_3: z.array(z.number().int().nullable()).nullable().optional(),
 });
 export type Lap = z.infer<typeof LapSchema>;
 

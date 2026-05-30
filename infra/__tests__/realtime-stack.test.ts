@@ -115,6 +115,12 @@ describe("RealtimeStack — WebSocket API", () => {
     });
   });
 
+  it("outputs the wss endpoint for the frontend", () => {
+    const outputs = synth().findOutputs("*");
+    const values = Object.values(outputs).map((o) => o.Description);
+    expect(values).toContain("wss endpoint for the dashboard's NEXT_PUBLIC_WS_URL");
+  });
+
   it("gates $connect with a REQUEST lambda authorizer on the token", () => {
     const t = synth();
     t.hasResourceProperties("AWS::ApiGatewayV2::Authorizer", {

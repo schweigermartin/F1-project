@@ -2,7 +2,15 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { CONN_PK_ATTR, CONN_SK_ATTR, CONN_TTL_ATTR } from "@f1/shared";
-import { ArnFormat, Duration, RemovalPolicy, Stack, type StackProps, Tags } from "aws-cdk-lib";
+import {
+  ArnFormat,
+  CfnOutput,
+  Duration,
+  RemovalPolicy,
+  Stack,
+  type StackProps,
+  Tags,
+} from "aws-cdk-lib";
 import { WebSocketApi, WebSocketStage } from "aws-cdk-lib/aws-apigatewayv2";
 import { WebSocketLambdaAuthorizer } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { WebSocketLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
@@ -192,6 +200,12 @@ export class RealtimeStack extends Stack {
       webSocketApi: this.webSocketApi,
       stageName: "live",
       autoDeploy: true,
+    });
+
+    // The wss:// endpoint to copy into the frontend's NEXT_PUBLIC_WS_URL.
+    new CfnOutput(this, "WebSocketUrl", {
+      value: this.webSocketStage.url,
+      description: "wss endpoint for the dashboard's NEXT_PUBLIC_WS_URL",
     });
 
     // ─── Subscribe λ ──────────────────────────────────────────────────────

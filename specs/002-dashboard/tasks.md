@@ -126,10 +126,13 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Verify:** 2 neue Stack-Assertions (3 benannte Alarme mit AlarmActions, `f1-realtime`-Dashboard) → **117 infra-Tests grün**. `cdk synth` + typecheck/lint/format grün (ohne Fixes).
 - **Notes:** **Abweichungen vom Plan, bewusst:** (1) eigenes Dashboard `f1-realtime` statt Erweiterung von `f1-pipeline` — saubere Stack-Ownership (kein Cross-Stack-Dashboard-Mutieren). (2) Alarme auf **Built-in-Lambda-Metriken** statt Custom-`PutMetricData` (`ActiveConnections`/`FanoutPostLatency`/…) — konsistent mit Phase 1 (deren `emitMetric` loggt nur, sendet keine CloudWatch-Metrik); `Authorizer-DenySpike` (Abuse) bräuchte einen Logs-MetricFilter → spätere Erweiterung; stattdessen Authorizer-**Failure**-Alarm.
 
-### T14 — Deploy (AWS + Vercel)
+### T14 — Deploy (AWS + Vercel) — PREPARED (Deploy ausstehend, braucht Credentials)
 
-- **Output:** `cdk deploy F1-Realtime` erfolgreich, WS-Endpoint live. Frontend auf Vercel deployed (Prod-URL). Env in beiden Vercel-Environments gesetzt.
-- **Verify:** Prod-URL öffnet, verbindet, zeigt entweder Live-Daten (während Session) oder bietet Replay an. Reconnect-Test: DevTools-Offline → < 5s Recovery (AC-4). Lighthouse Desktop ≥ 90 / Mobile ≥ 80 (AC-7).
+- **Vorbereitet (committet):**
+  - `CfnOutput WebSocketUrl` (= `webSocketStage.url`, wss-Endpoint) im `RealtimeStack` → nach dem Deploy direkt als `NEXT_PUBLIC_WS_URL` ablesbar. + Stack-Assertion.
+  - **Runbook [docs/phase-2-deploy.md](../../docs/phase-2-deploy.md)** — exakte Schritte: (1) SSM-Secret `openssl rand` → `put-parameter SecureString`, (2) Pre-Deploy-Gates, (3) `cdk deploy F1-Realtime` + Output ablesen, (4) Vercel-Projekt (Root `apps/dashboard`, Env `NEXT_PUBLIC_WS_URL`/`WS_TOKEN_SECRET` Preview+Prod) + `allowedOrigins` nachziehen, (5) Verify-Checkliste (Live/Replay/Reconnect<5s/Lighthouse/Kosten), Rollback.
+- **Auszuführen (Martin, lokal):** Runbook Schritte 1–5. `cdk synth F1-Realtime` ist grün, Stack ist deploy-bereit.
+- **Verify:** kommt mit dem Deploy (Prod-URL öffnet, Live/Replay, Reconnect, Lighthouse).
 
 ### T15 — Playwright-Smoke-E2E
 

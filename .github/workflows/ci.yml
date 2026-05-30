@@ -40,6 +40,9 @@ jobs:
       - name: tsc --noEmit (all workspaces)
         run: pnpm typecheck
 
+      - name: Unit tests (all workspaces)
+        run: pnpm test
+
   cdk-synth:
     name: CDK synth
     runs-on: ubuntu-latest

@@ -14,11 +14,15 @@ Reihenfolge bewusst: Schemas → Stacks → Lambdas → Wiring → Live-Test.
   - Rate-Limit ist Token-Bucket-artig: 4 RPS Burst, dann 429 mit `Retry-After: 1`. Sequentielle Fetches im Poller ausreichend (5 × 100ms = 500ms pro Tick).
   - Live-Datenfelder sind oft `null` (laufende Rundenzeiten etc.) → Zod-Schemas konsequent `nullable()`.
 
-## T2 — Zod-Schemas in `packages/shared`
+## T2 — Zod-Schemas in `packages/shared` — DONE
 
-- **Output:** `openf1-schema.ts` mit Schemas für alle 6 Endpoints (`sessions` + die 5 Daten-Endpoints), `event-schema.ts` mit `PipelineEventSchema`, `ddb-keys.ts` mit PK/SK-Helpers. Tests in `packages/shared/__tests__/`.
-- **Verify:** `pnpm -F shared test` grün. Schemas akzeptieren Fixtures aus T1, lehnen manipulierte Variante ab.
-- **Constitution:** VI — Validierung an Systemgrenzen.
+- **Output:**
+  - `src/openf1-schema.ts` mit 6 Schemas (`SessionSchema`, `PositionSchema`, `IntervalSchema`, `LapSchema`, `StintSchema`, `WeatherSchema`), `ENDPOINT_PAYLOAD_SCHEMAS`-Lookup, `isSessionActive()`.
+  - `src/event-schema.ts` mit `PipelineEventSchema` + `PIPELINE_EVENT_SCHEMA_VERSION`.
+  - `src/ddb-keys.ts` mit `sessionPK`, `metaSK`, `driverPositionSK`, `driverIntervalSK`, `lapSK` (zero-padded 4), `stintSK` (zero-padded 2), `weatherSK`, `ttlEpochSeconds`.
+  - 31 Vitest-Tests in `__tests__/` mit echten Fixtures aus T1 (Montréal Race) + Failure-Cases.
+- **Verify:** `pnpm -F @f1/shared test` → 31 pass. `pnpm typecheck` grün (Tests sind jetzt auch im tsc-Scope durch `rootDir: "."`).
+- **CI:** Test-Step im `ts`-Job hinzugefügt.
 
 ## T3 — Fixture-Sammlung
 

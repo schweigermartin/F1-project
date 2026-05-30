@@ -1,0 +1,12 @@
+{
+  "name": "@f1/dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Live F1 telemetry dashboard (Phase 2). Next.js + WebSocket frontend.",
+  "scripts": {
+    "build": "echo \"dashboard build placeholder — implemented in Phase 2\"",
+    "lint": "echo \"dashboard lint placeholder\"",
+    "test": "echo \"dashboard test placeholder\"",
+    "typecheck": "echo \"dashboard typecheck placeholder\""
+  }
+}

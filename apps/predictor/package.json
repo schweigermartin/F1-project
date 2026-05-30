@@ -1,0 +1,12 @@
+{
+  "name": "@f1/predictor",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Race outcome predictor frontend (Phase 4). Next.js + Bedrock explanations.",
+  "scripts": {
+    "build": "echo \"predictor build placeholder — implemented in Phase 4\"",
+    "lint": "echo \"predictor lint placeholder\"",
+    "test": "echo \"predictor test placeholder\"",
+    "typecheck": "echo \"predictor typecheck placeholder\""
+  }
+}

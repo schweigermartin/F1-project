@@ -1,0 +1,13 @@
+{
+  "name": "@f1/infra",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AWS CDK infrastructure for the F1 project (Phase 0+).",
+  "scripts": {
+    "build": "echo \"infra build placeholder — CDK stacks added in T6+\"",
+    "lint": "echo \"infra lint placeholder\"",
+    "test": "echo \"infra test placeholder\"",
+    "typecheck": "echo \"infra typecheck placeholder\"",
+    "cdk": "echo \"cdk placeholder — installed in T6\""
+  }
+}

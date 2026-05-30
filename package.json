@@ -1,0 +1,17 @@
+{
+  "name": "f1-project",
+  "version": "0.0.0",
+  "private": true,
+  "description": "F1 portfolio project — live telemetry dashboard + race outcome predictor with shared AWS data pipeline.",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@10.12.4",
+  "scripts": {
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

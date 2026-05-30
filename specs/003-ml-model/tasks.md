@@ -34,10 +34,10 @@ Reihenfolge bewusst: Setup → Layout/Schema → Target/Split → Feature-Pipeli
 - **Output:** `podium_label(results, position_col="position")` → 0/1-Series, `pd.to_numeric(errors="coerce")` → DNF/NC/NaN → 0. Pure.
 - **Verify:** 4 Tests (Top-3→1; Non-Finisher→0; non-numeric coerced; deterministisch) → ruff + mypy + pytest (12) grün.
 
-### T4 — Temporal Split (`split.py`)
+### T4 — Temporal Split (`split.py`) — DONE
 
-- **Output:** `temporal_split(df, train_max_year, val_year, test_year)` → (train, val, test) ohne Shuffle, nach Renn-Datum.
-- **Verify:** Test: keine Test-Zeile mit Datum ≤ Train, keine Überlappung, leere Spanne sauber behandelt.
+- **Output:** `temporal_split(df, *, train_max_year, val_year, test_year, year_col="year")` → frozen `Split(train, val, test)` nach Saison-Jahr, kein Shuffle; `ValueError` wenn Jahre nicht streng steigend.
+- **Verify:** 4 Tests (Zuordnung; Ordnungs-Invariante max(train) < min(test/val); non-increasing → ValueError; fehlende Saison → leerer Frame) → ruff + mypy + pytest (16) grün.
 
 ### T5 — Feature-Pipeline (`features.py`)
 

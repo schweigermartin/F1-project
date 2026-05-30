@@ -164,3 +164,37 @@ describe("RealtimeStack — fanout", () => {
     });
   });
 });
+
+describe("RealtimeStack — replay", () => {
+  it("wires replay:start and replay:stop routes", () => {
+    const t = synth();
+    t.hasResourceProperties("AWS::ApiGatewayV2::Route", { RouteKey: "replay:start" });
+    t.hasResourceProperties("AWS::ApiGatewayV2::Route", { RouteKey: "replay:stop" });
+  });
+
+  it("lets replay read the S3 archive and self-invoke for continuation", () => {
+    const t = synth();
+    // s3:ListBucket (to locate the dated key) is the deterministic statement.
+    t.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({ Action: "s3:ListBucket", Effect: "Allow" }),
+        ]),
+      }),
+    });
+    t.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({ Action: "lambda:InvokeFunction", Effect: "Allow" }),
+        ]),
+      }),
+    });
+  });
+
+  it("gives replay the 15-minute timeout the continuation chain needs", () => {
+    synth().hasResourceProperties("AWS::Lambda::Function", {
+      FunctionName: "F1-WS-Replay",
+      Timeout: 900,
+    });
+  });
+});

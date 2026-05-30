@@ -2,7 +2,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { CONN_PK_ATTR, CONN_SK_ATTR, CONN_TTL_ATTR } from "@f1/shared";
-import { Duration, RemovalPolicy, Stack, type StackProps, Tags } from "aws-cdk-lib";
+import { ArnFormat, Duration, RemovalPolicy, Stack, type StackProps, Tags } from "aws-cdk-lib";
 import { WebSocketApi, WebSocketStage } from "aws-cdk-lib/aws-apigatewayv2";
 import { WebSocketLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
@@ -55,6 +55,7 @@ export class RealtimeStack extends Stack {
   readonly disconnectFn: lambda.IFunction;
   readonly subscribeFn: lambda.IFunction;
   readonly fanoutFn: lambda.IFunction;
+  readonly replayFn: lambda.Function;
 
   constructor(scope: Construct, id: string, props: RealtimeStackProps) {
     super(scope, id, props);
@@ -206,5 +207,61 @@ export class RealtimeStack extends Stack {
       }),
     );
     this.webSocketApi.grantManageConnections(this.fanoutFn);
+
+    // ─── Replay λ (S3 JSONL → paced stream) ───────────────────────────────
+    // replay:start sets state + fires an async self-invoke; the playback runs
+    // in continuation invocations (not bound by the 29s WS integration
+    // timeout), chaining via cursor until the session ends (R-3).
+    const replayFnName = "F1-WS-Replay";
+    this.replayFn = new NodejsFunction(this, "WsReplayFn", {
+      functionName: replayFnName,
+      entry: path.join(lambdaDir("ws-replay"), "index.ts"),
+      handler: "handler",
+      ...lambdaDefaults,
+      memorySize: 512,
+      timeout: Duration.minutes(15),
+      environment: {
+        CONNECTIONS_TABLE_NAME: this.connectionsTable.tableName,
+        DATA_BUCKET_NAME: this.dataBucket.bucketName,
+        WS_CALLBACK_URL: this.webSocketStage.callbackUrl,
+      },
+    });
+    this.dataBucket.grantRead(this.replayFn, "raw/sessions/*");
+    this.replayFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        // List to locate the dated key; the bucket-level ARN is required for List.
+        actions: ["s3:ListBucket"],
+        resources: [this.dataBucket.bucketArn],
+        conditions: { StringLike: { "s3:prefix": ["raw/sessions/*"] } },
+      }),
+    );
+    this.replayFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:GetItem", "dynamodb:UpdateItem"],
+        resources: [this.connectionsTable.tableArn],
+      }),
+    );
+    this.webSocketApi.grantManageConnections(this.replayFn);
+    // Self-invoke for the continuation chain. Build the ARN from the known
+    // function name rather than this.replayFn.functionArn (a GetAtt) — the
+    // latter would make the function's own role policy depend on the function,
+    // creating an undeployable dependency cycle.
+    this.replayFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["lambda:InvokeFunction"],
+        resources: [
+          Stack.of(this).formatArn({
+            service: "lambda",
+            resource: "function",
+            resourceName: replayFnName,
+            arnFormat: ArnFormat.COLON_RESOURCE_NAME,
+          }),
+        ],
+      }),
+    );
+
+    const replayIntegration = new WebSocketLambdaIntegration("ReplayIntegration", this.replayFn);
+    this.webSocketApi.addRoute("replay:start", { integration: replayIntegration });
+    this.webSocketApi.addRoute("replay:stop", { integration: replayIntegration });
   }
 }

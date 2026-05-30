@@ -58,10 +58,14 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Verify:** 11 Handler-Tests (image→delta inkl. Attr-Stripping/weather/meta-null/Non-Session-PK; fan-out an N Connections, Lookup-once-per-Session, no-subscriber-no-op, REMOVE-skip, 410-delete-ohne-Batch-Fail, real-error-rethrow) + 2 Stack-Assertions (EventSourceMapping LATEST/100/ReportBatchItemFailures, scoped IAM) → **88 infra-Tests + 58 shared grün**. `cdk synth` + typecheck/lint/format grün.
 - **Notes:** **Live-Pfad ist damit end-to-end** (Poller → … → DDB → Stream → Browser).
 
-### T6 — Replay-Lambda (S3-JSONL → getakteter Stream)
+### T6 — Replay-Lambda (S3-JSONL → getakteter Stream) — DONE
 
-- **Output:** Routen `replay:start`/`replay:stop`. `replay λ` (`handler.ts` pure DI): liest `S3_PATHS.rawSession(...)`, spielt Zeilen nach `(fetched_at - t0)/speed`, Self-Continuation via async self-`Invoke` mit `cursor`, Abbruch-Check (Disconnect/`replay:stop`/`410`) vor jedem Post, `replay:end` am Ende.
-- **Verify:** Unit mit Fake Timers + gepinnter Clock — Reihenfolge chronologisch, Speed-Skalierung 1×/2×/4×, Cursor-Übergabe, Stop bei Abbruch-Flag, fehlende Datei → `session-not-archived`. Fixture-JSONL aus T3-Daten.
+- **Output:**
+  - Routen `replay:start`/`replay:stop` (beide → `ws-replay λ`). `handler.ts` pure DI: `expandLines()` parst die archivierten PipelineEvent-Zeilen → flache, chronologisch sortierte `delta`-Timeline (Endpoint→Entity-Mapping). `handleReplay()` spielt ab `cursor` nach `(fetched_at − chunkStart)/speed`, Abbruch-Check alle 20 deltas, Self-Continuation bei Überschreiten des Wall-Budgets (10 min) via `scheduleContinuation(nextCursor)`, `replay:end` am Ende; `410`→`gone`, echter Fehler→rethrow.
+  - `index.ts`: `replay:start` setzt `aborted=false`+frischen `replayId` und feuert **sofort** einen async Self-Invoke (cursor 0) — Wiedergabe läuft im Continuation-Pfad, nicht inline (umgeht den 29s-WS-Integration-Timeout, R-3). `replay:stop` setzt `aborted=true`. `isAborted` = Row fehlt ∨ `aborted` ∨ `replayId`-Mismatch (tötet verwaiste Ketten). `loadLines` listet `raw/sessions/` + matcht `/<session>.jsonl` (Datum steckt im Key), liest via `transformToString`.
+  - Stack: 15-min-Timeout, `grantRead` + `s3:ListBucket` (raw/sessions/\*), `GetItem`+`UpdateItem` auf Connections, `grantManageConnections`, **self-`InvokeFunction`** (ARN via `formatArn` aus dem Funktionsnamen, **nicht** `functionArn`/GetAtt → sonst Dependency-Cycle). Neue Dep `@aws-sdk/client-lambda`.
+- **Verify:** 11 Handler-Tests (expandLines sort/skip/entity-mapping; not-archived; full-play→replay:end; **Speed-Skalierung 1×/2×/4×** via gepinnter Clock; Cursor-Continuation bei Budget 0; Resume-ab-Cursor; Abort-Stop; 410-gone; real-error-rethrow) + 3 Stack-Assertions (replay:start/stop-Routen, S3-List+self-Invoke-IAM, 900s-Timeout) → **104 infra-Tests grün**. `cdk synth` + typecheck/lint/format grün.
+- **Notes:** **Replay-Pfad steht** (Constitution V). Backend ist damit komplett — ab T9 Frontend.
 
 ### T7 — Wiring + IAM (least privilege)
 

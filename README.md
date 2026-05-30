@@ -1,5 +1,7 @@
 # F1 Portfolio Project
 
+[![CI](https://github.com/schweigermartin/F1-project/actions/workflows/ci.yml/badge.svg)](https://github.com/schweigermartin/F1-project/actions/workflows/ci.yml)
+
 Zwei zusammenhängende Systeme, die eine gemeinsame Datenpipeline teilen:
 
 1. **Live Telemetry Dashboard** — event-driven AWS-Pipeline, die OpenF1-Daten in Echtzeit ingestiert, persistiert und über WebSockets in ein React-Frontend pusht. Demonstriert Infra-Skills (Lambda, SQS, DynamoDB, S3, EventBridge, API Gateway, IaC).
@@ -23,14 +25,14 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 
 ## Phasen
 
-| #   | Phase                                                      | Status     | Ergebnis                                                  |
-| --- | ---------------------------------------------------------- | ---------- | --------------------------------------------------------- |
-| 0   | [Foundation](specs/000-foundation/spec.md)                 | spec-ready | Monorepo + AWS-Setup + CDK + S3-Layout                    |
-| 1   | [Data Pipeline](specs/001-data-pipeline/spec.md)           | spec-ready | OpenF1 → SQS → Lambda → DynamoDB + S3                     |
-| 2   | [Live Dashboard](specs/002-dashboard/spec.md)              | stub       | WebSocket-API + React-Frontend auf Vercel                 |
-| 3   | [ML Model](specs/003-ml-model/spec.md)                     | stub       | XGBoost-Podium-Classifier + SHAP + S3-Artefakt            |
-| 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md) | stub       | Inference-Lambda + Bedrock-Erklärung + Predictor-Frontend |
-| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)           | stub       | Hit-Rate-Tracking + optional Re-Training                  |
+| #   | Phase                                                      | Status      | Ergebnis                                                          |
+| --- | ---------------------------------------------------------- | ----------- | ----------------------------------------------------------------- |
+| 0   | [Foundation](specs/000-foundation/spec.md)                 | in progress | Monorepo + AWS-Setup + CDK + S3-Layout (deployed in eu-central-1) |
+| 1   | [Data Pipeline](specs/001-data-pipeline/spec.md)           | spec-ready  | OpenF1 → SQS → Lambda → DynamoDB + S3                             |
+| 2   | [Live Dashboard](specs/002-dashboard/spec.md)              | stub        | WebSocket-API + React-Frontend auf Vercel                         |
+| 3   | [ML Model](specs/003-ml-model/spec.md)                     | stub        | XGBoost-Podium-Classifier + SHAP + S3-Artefakt                    |
+| 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md) | stub        | Inference-Lambda + Bedrock-Erklärung + Predictor-Frontend         |
+| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)           | stub        | Hit-Rate-Tracking + optional Re-Training                          |
 
 ## Stack
 
@@ -46,3 +48,43 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 ## Reihenfolge
 
 Phase 0 → 1 → 2 → 3 → 4 → 5. Phase 2 schließt Projekt 2 ab; Phase 4 schließt Projekt 1 ab. Wenn die Zeit ausgeht, gibt es nach Phase 2 schon eine vollständige Demo.
+
+## Setup (lokal)
+
+Voraussetzungen: Node ≥ 20, pnpm ≥ 9, Python ≥ 3.12, AWS CLI v2, ein AWS-Account mit IAM-User der mindestens `PowerUserAccess` hat.
+
+```bash
+# 1. Klonen und Dependencies
+git clone git@github.com:schweigermartin/F1-project.git
+cd F1-project
+pnpm install
+
+# 2. Eigene Env-Variablen anlegen
+cp .env.example .env
+# .env editieren: AWS_PROFILE auf deinen lokalen Profilnamen,
+# CDK_DEFAULT_ACCOUNT auf deine Account-ID.
+
+# 3. AWS-Profil konfigurieren (einmalig)
+aws configure --profile <dein-profil>
+# Verify:
+AWS_PROFILE=<dein-profil> aws sts get-caller-identity
+
+# 4. Lokale Validierung — alle drei sollten grün sein
+pnpm lint
+pnpm typecheck
+AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk synth
+
+# 5. CDK Bootstrap (einmalig pro Account/Region)
+AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk bootstrap aws://<account>/<region>
+
+# 6. Deploy
+AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk deploy F1-DataLayer
+```
+
+Nach Schritt 6 existiert der S3-Bucket `f1-data-<account>-<region>` in deinem AWS-Account.
+
+### Konsolen-Links (für Martins Account `128663321407`)
+
+- [CloudFormation-Stacks (eu-central-1)](https://eu-central-1.console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks?filteringStatus=active)
+- [S3-Bucket](https://eu-central-1.console.aws.amazon.com/s3/buckets/f1-data-128663321407-eu-central-1)
+- [Budgets](https://us-east-1.console.aws.amazon.com/billing/home#/budgets)

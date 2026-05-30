@@ -28,6 +28,7 @@ new RealtimeStack(app, "F1-Realtime", {
     "WebSocket layer (API GW → fanout off F1Live stream + replay from S3) for the live dashboard.",
   liveTable: pipeline.liveTable,
   dataBucket: dataLayer.dataBucket,
+  alertTopic: pipeline.alertTopic,
 });
 
 // Constitution Artikel III: every resource gets these tags so we can audit

@@ -117,10 +117,14 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Verify:** 3 pure Tests (trim/valid, leer/whitespace abgelehnt, Speeds = [1,2,4]) → **21 dashboard-Tests grün**. `build`/`typecheck` + Root-`lint`/`format` grün.
 - **Notes:** Session-Auswahl ist vorerst eine Texteingabe (kein „archivierte Sessions auflisten"-Endpoint im Backend) — ein S3-List-Endpoint wäre eine spätere Erweiterung. Chronologie/Speed-Skalierung des eigentlichen Replays sind backend-seitig in T6 abgedeckt + getestet; End-to-End-Beleg kommt mit T14-Deploy + T15-E2E.
 
-### T13 — Observability (Realtime)
+### T13 — Observability (Realtime) — DONE
 
-- **Output:** Custom Metrics (`ActiveConnections`, `FanoutPostLatency`, `FanoutGoneConnections`, `ReplayChunks`, `ReplayErrors`, `AuthorizerDeny`). Alarme `Fanout-ErrorRate`, `Replay-Failure`, `Authorizer-DenySpike` → SNS `f1-alerts`. Dashboard `f1-pipeline` um Realtime-Widgets erweitert.
-- **Verify:** `cdk synth` grün, Alarme im Template, melden an bestehendes Topic.
+- **Output:**
+  - `PipelineStack` exponiert `alertTopic` (`readonly`); `bin/app.ts` reicht es an `RealtimeStack` (wie `liveTable`) → alle Phasen alarmieren an **ein** Topic `f1-alerts`.
+  - 3 Alarme an dem Topic: `F1-Fanout-ErrorRate` (>5 % via MathExpression, Live-Push bricht ab), `F1-Replay-Failure` (>0 Errors/15min, Demo-Pflicht Constitution V), `F1-Authorizer-Failure` (>0 Errors/5min — wenn der Authorizer kippt, kann niemand verbinden).
+  - Dashboard `f1-realtime`: WS-API-Metriken (ConnectCount/MessageCount + ExecutionError/ClientError), Invocations + Errors aller WS-Lambdas, Fanout-vs-Replay-Dauer (p95).
+- **Verify:** 2 neue Stack-Assertions (3 benannte Alarme mit AlarmActions, `f1-realtime`-Dashboard) → **117 infra-Tests grün**. `cdk synth` + typecheck/lint/format grün (ohne Fixes).
+- **Notes:** **Abweichungen vom Plan, bewusst:** (1) eigenes Dashboard `f1-realtime` statt Erweiterung von `f1-pipeline` — saubere Stack-Ownership (kein Cross-Stack-Dashboard-Mutieren). (2) Alarme auf **Built-in-Lambda-Metriken** statt Custom-`PutMetricData` (`ActiveConnections`/`FanoutPostLatency`/…) — konsistent mit Phase 1 (deren `emitMetric` loggt nur, sendet keine CloudWatch-Metrik); `Authorizer-DenySpike` (Abuse) bräuchte einen Logs-MetricFilter → spätere Erweiterung; stattdessen Authorizer-**Failure**-Alarm.
 
 ### T14 — Deploy (AWS + Vercel)
 

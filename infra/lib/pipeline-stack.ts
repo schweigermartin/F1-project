@@ -51,6 +51,7 @@ export class PipelineStack extends Stack {
   readonly archiverFn: lambda.IFunction;
   readonly scheduleSyncFn: lambda.IFunction;
   readonly schedulerInvokeRole: iam.Role;
+  readonly alertTopic: sns.Topic;
 
   constructor(scope: Construct, id: string, props: PipelineStackProps) {
     super(scope, id, props);
@@ -210,6 +211,8 @@ export class PipelineStack extends Stack {
       displayName: "F1 Pipeline Alerts",
     });
     alertTopic.addSubscription(new snsSubs.EmailSubscription("martin_schweiger@outlook.de"));
+    // Shared with RealtimeStack (Phase 2) so all phases alert to one place.
+    this.alertTopic = alertTopic;
     const alertAction = new cwActions.SnsAction(alertTopic);
 
     // DLQ-depth: any message in the DLQ is a real problem.

@@ -3,16 +3,18 @@ import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as sns from "aws-cdk-lib/aws-sns";
 import { type Construct } from "constructs";
 import { describe, expect, it } from "vitest";
 
 import { RealtimeStack } from "../lib/realtime-stack.js";
 
-// Materialise the Phase 1 cross-stack inputs (F1Live + bucket) without
-// pulling in the real stacks — keeps each test isolated.
+// Materialise the Phase 1 cross-stack inputs (F1Live + bucket + alert topic)
+// without pulling in the real stacks — keeps each test isolated.
 class TestDepsStack extends Stack {
   readonly liveTable: dynamodb.TableV2;
   readonly bucket: s3.Bucket;
+  readonly topic: sns.Topic;
   constructor(scope: Construct, id: string) {
     super(scope, id);
     this.liveTable = new dynamodb.TableV2(this, "TestLive", {
@@ -20,6 +22,7 @@ class TestDepsStack extends Stack {
       dynamoStream: dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
     });
     this.bucket = new s3.Bucket(this, "TestBucket");
+    this.topic = new sns.Topic(this, "TestTopic");
   }
 }
 
@@ -29,6 +32,7 @@ function synth(): Template {
   const stack = new RealtimeStack(app, "TestRealtime", {
     liveTable: deps.liveTable,
     dataBucket: deps.bucket,
+    alertTopic: deps.topic,
   });
   return Template.fromStack(stack);
 }
@@ -217,6 +221,24 @@ describe("RealtimeStack — replay", () => {
     synth().hasResourceProperties("AWS::Lambda::Function", {
       FunctionName: "F1-WS-Replay",
       Timeout: 900,
+    });
+  });
+});
+
+describe("RealtimeStack — observability (T13)", () => {
+  it("alarms on fanout error-rate, replay failure and authorizer failure, to the shared topic", () => {
+    const t = synth();
+    for (const name of ["F1-Fanout-ErrorRate", "F1-Replay-Failure", "F1-Authorizer-Failure"]) {
+      t.hasResourceProperties("AWS::CloudWatch::Alarm", {
+        AlarmName: name,
+        AlarmActions: Match.anyValue(),
+      });
+    }
+  });
+
+  it("publishes the f1-realtime dashboard", () => {
+    synth().hasResourceProperties("AWS::CloudWatch::Dashboard", {
+      DashboardName: "f1-realtime",
     });
   });
 });

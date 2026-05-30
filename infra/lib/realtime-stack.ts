@@ -6,6 +6,8 @@ import { ArnFormat, Duration, RemovalPolicy, Stack, type StackProps, Tags } from
 import { WebSocketApi, WebSocketStage } from "aws-cdk-lib/aws-apigatewayv2";
 import { WebSocketLambdaAuthorizer } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { WebSocketLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
+import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
+import * as cwActions from "aws-cdk-lib/aws-cloudwatch-actions";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { type ITableV2 } from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
@@ -14,6 +16,7 @@ import { DynamoEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as logs from "aws-cdk-lib/aws-logs";
 import { type IBucket } from "aws-cdk-lib/aws-s3";
+import { type ITopic } from "aws-cdk-lib/aws-sns";
 import { type Construct } from "constructs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -33,6 +36,8 @@ export interface RealtimeStackProps extends StackProps {
   readonly dataBucket: IBucket;
   /** Origin allowlist for the $connect authorizer (exact or `*.suffix`). */
   readonly allowedOrigins?: string[];
+  /** Shared SNS alert topic from PipelineStack — all phases alert here. */
+  readonly alertTopic: ITopic;
 }
 
 /**
@@ -307,5 +312,103 @@ export class RealtimeStack extends Stack {
     const replayIntegration = new WebSocketLambdaIntegration("ReplayIntegration", this.replayFn);
     this.webSocketApi.addRoute("replay:start", { integration: replayIntegration });
     this.webSocketApi.addRoute("replay:stop", { integration: replayIntegration });
+
+    // ─── Alarms + Dashboard (Constitution VIII) ───────────────────────────
+    const alertAction = new cwActions.SnsAction(props.alertTopic);
+
+    const errorRatePercent = (fn: lambda.IFunction): cloudwatch.MathExpression =>
+      new cloudwatch.MathExpression({
+        expression: "errors / IF(invocations > 0, invocations, 1) * 100",
+        usingMetrics: {
+          errors: fn.metricErrors({ period: Duration.minutes(5) }),
+          invocations: fn.metricInvocations({ period: Duration.minutes(5) }),
+        },
+        period: Duration.minutes(5),
+      });
+
+    // Fanout failing means live deltas stop reaching browsers mid-session.
+    new cloudwatch.Alarm(this, "FanoutErrorRateAlarm", {
+      alarmName: "F1-Fanout-ErrorRate",
+      metric: errorRatePercent(this.fanoutFn),
+      threshold: 5,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
+    // A replay error breaks the always-available demo (Constitution V).
+    new cloudwatch.Alarm(this, "ReplayFailureAlarm", {
+      alarmName: "F1-Replay-Failure",
+      metric: this.replayFn.metricErrors({ period: Duration.minutes(15) }),
+      threshold: 0,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
+    // If the authorizer errors (e.g. SSM unreachable) nobody can connect.
+    new cloudwatch.Alarm(this, "AuthorizerFailureAlarm", {
+      alarmName: "F1-Authorizer-Failure",
+      metric: this.authorizerFn.metricErrors({ period: Duration.minutes(5) }),
+      threshold: 0,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
+    const apiMetric = (metricName: string): cloudwatch.Metric =>
+      new cloudwatch.Metric({
+        namespace: "AWS/ApiGateway",
+        metricName,
+        dimensionsMap: { ApiId: this.webSocketApi.apiId, Stage: this.webSocketStage.stageName },
+        statistic: "Sum",
+        period: Duration.minutes(5),
+      });
+
+    new cloudwatch.Dashboard(this, "RealtimeDashboard", {
+      dashboardName: "f1-realtime",
+      widgets: [
+        [
+          new cloudwatch.GraphWidget({
+            title: "WebSocket API (connections + messages)",
+            left: [apiMetric("ConnectCount"), apiMetric("MessageCount")],
+            right: [apiMetric("ExecutionError"), apiMetric("ClientError")],
+            width: 12,
+          }),
+          new cloudwatch.GraphWidget({
+            title: "WS Lambda invocations",
+            left: [
+              this.connectFn.metricInvocations(),
+              this.subscribeFn.metricInvocations(),
+              this.fanoutFn.metricInvocations(),
+              this.replayFn.metricInvocations(),
+              this.authorizerFn.metricInvocations(),
+            ],
+            width: 12,
+          }),
+        ],
+        [
+          new cloudwatch.GraphWidget({
+            title: "WS Lambda errors",
+            left: [
+              this.fanoutFn.metricErrors({ color: cloudwatch.Color.RED }),
+              this.subscribeFn.metricErrors({ color: cloudwatch.Color.ORANGE }),
+              this.replayFn.metricErrors(),
+              this.authorizerFn.metricErrors(),
+              this.connectFn.metricErrors(),
+            ],
+            width: 12,
+          }),
+          new cloudwatch.GraphWidget({
+            title: "Fanout vs replay duration (p95)",
+            left: [
+              this.fanoutFn.metricDuration({ statistic: "p95" }),
+              this.replayFn.metricDuration({ statistic: "p95" }),
+            ],
+            width: 12,
+          }),
+        ],
+      ],
+    });
   }
 }

@@ -81,10 +81,14 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Verify:** 5 Token-Tests in shared (mint/verify, expired, falsches Secret, manipuliertes exp, malformed) + 6 Authorizer-Handler-Tests (Origin exakt/Wildcard/Look-alike/missing; allow; Deny-Origin-vor-Token; missing/expired Token) + 2 Stack-Assertions (REQUEST-Authorizer auf `$connect` CUSTOM, scoped SSM-Grant) → **115 infra + 63 shared grün**. `cdk synth` + typecheck (alle 4 Workspaces) + lint/format grün. esbuild bündelt den `@f1/shared/ws-token`-Subpath sauber.
 - **Notes:** Das Secret wird **out-of-band** angelegt (nie im Template, Constitution VII): `aws ssm put-parameter --name /f1/ws-token-secret --type SecureString --value <random>` — gehört in den T14-Deploy-Runbook. **Backend Phase 2 ist damit komplett — ab T9 Frontend.**
 
-### T9 — Frontend-Scaffold (`apps/dashboard`)
+### T9 — Frontend-Scaffold (`apps/dashboard`) — DONE
 
-- **Output:** Echte Next.js-App (App Router, TS) ersetzt den Stub. Reale `build`/`lint`/`typecheck`/`test`-Scripts (ESLint-React-Block greift bereits). Vercel-Projekt + `NEXT_PUBLIC_WS_URL`/Token-Env (Preview/Prod getrennt). Leere `RacePage`.
-- **Verify:** `pnpm -F @f1/dashboard build` + `typecheck` grün, lokaler `next dev` lädt, Root-`pnpm lint` bleibt grün.
+- **Output:**
+  - Next.js 16 (App Router, React 19) ersetzt den Stub (`src/index.ts` entfernt). `next.config.mjs` mit `transpilePackages: ["@f1/shared"]` (shared ist TS-Source) + `reactStrictMode`. `src/app/{layout.tsx,page.tsx,globals.css}` — `RacePage`-Placeholder (Socket-Hook T10, visx T11, Replay-UI T12).
+  - `src/app/api/ws-token/route.ts` — server-seitiger Route-Handler signiert via `@f1/shared/ws-token` (`mintWsToken`), liefert `{token, wsUrl}`, `force-dynamic` (60s-TTL, nie gecacht). `node:crypto` bleibt server-only.
+  - Reale Scripts: `dev`/`build`/`start`/`typecheck`/`test` (`vitest --passWithNoTests`); `lint` delegiert ans Root-eslint (wie infra/shared). `.env.example` (`NEXT_PUBLIC_WS_URL` + server-only `WS_TOKEN_SECRET`). tsconfig um Next-Includes + Plugin erweitert. `next-env.d.ts` gitignored (generiert, importiert `.next/types`).
+- **Verify:** `pnpm -F @f1/dashboard build` grün (3 Routen: `/`, `/_not-found`, `ƒ /api/ws-token`). typecheck (alle 4 Workspaces) + Root-`pnpm lint` + `format:check` grün. Sauberer typecheck ohne `.next`/`next-env.d.ts` bestätigt → CI-tauglich.
+- **Notes:** Vercel-Projekt + Env-Wiring ist Deploy-Zeit (T14).
 
 ### T10 — `useRaceSocket` + Zustand-Store
 

@@ -86,3 +86,45 @@ describe("RealtimeStack — F1Connections table", () => {
     });
   });
 });
+
+describe("RealtimeStack — WebSocket API", () => {
+  it("creates one WEBSOCKET API with action-based route selection", () => {
+    const t = synth();
+    t.resourceCountIs("AWS::ApiGatewayV2::Api", 1);
+    t.hasResourceProperties("AWS::ApiGatewayV2::Api", {
+      ProtocolType: "WEBSOCKET",
+      RouteSelectionExpression: "$request.body.action",
+    });
+  });
+
+  it("wires $connect and $disconnect routes", () => {
+    const t = synth();
+    t.hasResourceProperties("AWS::ApiGatewayV2::Route", { RouteKey: "$connect" });
+    t.hasResourceProperties("AWS::ApiGatewayV2::Route", { RouteKey: "$disconnect" });
+  });
+
+  it("deploys an auto-deploy 'live' stage", () => {
+    synth().hasResourceProperties("AWS::ApiGatewayV2::Stage", {
+      StageName: "live",
+      AutoDeploy: true,
+    });
+  });
+
+  it("grants connect PutItem and disconnect DeleteItem only (least privilege)", () => {
+    const t = synth();
+    t.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({ Action: "dynamodb:PutItem", Effect: "Allow" }),
+        ]),
+      }),
+    });
+    t.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({ Action: "dynamodb:DeleteItem", Effect: "Allow" }),
+        ]),
+      }),
+    });
+  });
+});

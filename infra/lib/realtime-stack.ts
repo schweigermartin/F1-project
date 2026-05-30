@@ -1,9 +1,21 @@
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { CONN_PK_ATTR, CONN_SK_ATTR, CONN_TTL_ATTR } from "@f1/shared";
 import { RemovalPolicy, Stack, type StackProps, Tags } from "aws-cdk-lib";
+import { WebSocketApi, WebSocketStage } from "aws-cdk-lib/aws-apigatewayv2";
+import { WebSocketLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { type ITableV2 } from "aws-cdk-lib/aws-dynamodb";
+import * as iam from "aws-cdk-lib/aws-iam";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
+import * as logs from "aws-cdk-lib/aws-logs";
 import { type IBucket } from "aws-cdk-lib/aws-s3";
 import { type Construct } from "constructs";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const lambdaDir = (sub: string): string => path.resolve(__dirname, "..", "lambda", sub);
 
 export interface RealtimeStackProps extends StackProps {
   /** F1Live table from PipelineStack — its stream feeds the fanout λ (T5). */
@@ -36,6 +48,10 @@ export class RealtimeStack extends Stack {
   readonly liveTable: ITableV2;
   readonly dataBucket: IBucket;
   readonly connectionsTable: dynamodb.TableV2;
+  readonly webSocketApi: WebSocketApi;
+  readonly webSocketStage: WebSocketStage;
+  readonly connectFn: lambda.IFunction;
+  readonly disconnectFn: lambda.IFunction;
 
   constructor(scope: Construct, id: string, props: RealtimeStackProps) {
     super(scope, id, props);
@@ -58,6 +74,71 @@ export class RealtimeStack extends Stack {
       timeToLiveAttribute: CONN_TTL_ATTR,
       removalPolicy: RemovalPolicy.DESTROY,
       pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: false },
+    });
+
+    // ─── Lambda baseline ──────────────────────────────────────────────────
+    const lambdaDefaults = {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      architecture: lambda.Architecture.ARM_64,
+      logRetention: logs.RetentionDays.TWO_WEEKS,
+      bundling: {
+        format: OutputFormat.ESM,
+        target: "node20",
+        // The Lambda runtime ships AWS SDK v3, so don't bundle it.
+        externalModules: ["@aws-sdk/*"] as string[],
+      },
+      environment: { CONNECTIONS_TABLE_NAME: this.connectionsTable.tableName },
+    };
+
+    // ─── Connect / Disconnect λ ───────────────────────────────────────────
+    this.connectFn = new NodejsFunction(this, "WsConnectFn", {
+      functionName: "F1-WS-Connect",
+      entry: path.join(lambdaDir("ws-connect"), "index.ts"),
+      handler: "handler",
+      ...lambdaDefaults,
+      memorySize: 256,
+    });
+    // Least privilege (Constitution VII): connect only ever PutItems its row.
+    this.connectFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:PutItem"],
+        resources: [this.connectionsTable.tableArn],
+      }),
+    );
+
+    this.disconnectFn = new NodejsFunction(this, "WsDisconnectFn", {
+      functionName: "F1-WS-Disconnect",
+      entry: path.join(lambdaDir("ws-disconnect"), "index.ts"),
+      handler: "handler",
+      ...lambdaDefaults,
+      memorySize: 256,
+    });
+    // Disconnect only ever DeleteItems its own row (also aborts a replay).
+    this.disconnectFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:DeleteItem"],
+        resources: [this.connectionsTable.tableArn],
+      }),
+    );
+
+    // ─── WebSocket API ────────────────────────────────────────────────────
+    // Route selection on $request.body.action (CDK default) drives the
+    // custom routes (subscribe / replay) added in T4+. $connect auth lands
+    // in T8.
+    this.webSocketApi = new WebSocketApi(this, "RealtimeApi", {
+      apiName: "F1-Realtime",
+      connectRouteOptions: {
+        integration: new WebSocketLambdaIntegration("ConnectIntegration", this.connectFn),
+      },
+      disconnectRouteOptions: {
+        integration: new WebSocketLambdaIntegration("DisconnectIntegration", this.disconnectFn),
+      },
+    });
+
+    this.webSocketStage = new WebSocketStage(this, "LiveStage", {
+      webSocketApi: this.webSocketApi,
+      stageName: "live",
+      autoDeploy: true,
     });
   }
 }

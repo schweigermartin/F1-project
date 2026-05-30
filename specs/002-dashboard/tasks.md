@@ -30,10 +30,14 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Verify:** `cdk list` zeigt `F1-DataLayer` / `F1-Pipeline` / `F1-Realtime`. `cdk synth F1-Realtime` grün. 7 Assertion-Tests (PK/SK, Billing, TTL, Name, Removal, Table-Count, Phase-Tag) → **54 infra-Tests grün**. typecheck/lint/format grün.
 - **Notes:** `liveTable` ist in `PipelineStack` bereits `readonly` exponiert (Stream-ARN für T5).
 
-### T3 — WebSocket-API + Connect/Disconnect
+### T3 — WebSocket-API + Connect/Disconnect — DONE
 
-- **Output:** API-Gateway-v2-WebSocket-API mit Routen `$connect`/`$disconnect`. `connect λ`/`disconnect λ` (`handler.ts` pure DI + `index.ts`): Put/Delete in `F1Connections`. Disconnect setzt Abbruch-Flag für laufende Replays.
-- **Verify:** Unit-Tests (Put/Delete idempotent, Abbruch-Flag). Assertion-Test: Routen existieren, Integrationen verdrahtet.
+- **Output:**
+  - `WebSocketApi` (`F1-Realtime`, route-selection `$request.body.action`) + `WebSocketStage` `live` (auto-deploy) im `RealtimeStack`.
+  - `infra/lambda/ws-connect/` + `infra/lambda/ws-disconnect/` (je `handler.ts` pure DI + `index.ts` mit `APIGatewayProxyWebsocketHandlerV2`). Connect PutItem't eine Connection-Row (conn#-PK, meta-SK, 2h-TTL); Disconnect DeleteItem't sie — die Löschung ist zugleich das Replay-Abbruch-Signal (T6 stoppt bei fehlender Row, R-3).
+  - Least privilege (Constitution VII): Connect-Rolle nur `dynamodb:PutItem`, Disconnect-Rolle nur `dynamodb:DeleteItem` auf die `F1Connections`-ARN.
+- **Verify:** 6 Handler-Unit-Tests (Item-Shape, TTL, single Put/Delete, DDB-Fehler-Propagation) + 4 Stack-Assertions (WEBSOCKET-API, `$connect`/`$disconnect`-Routen, auto-deploy-Stage, scoped IAM) → **64 infra-Tests grün**. `cdk synth F1-Realtime` + typecheck/lint/format grün.
+- **Notes:** `$connect`-Authorizer kommt in T8; custom Routen (subscribe/replay) in T4/T6.
 
 ### T4 — Subscribe-Route + Snapshot aus DDB
 

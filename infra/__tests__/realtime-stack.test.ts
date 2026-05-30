@@ -4,7 +4,7 @@ import { Match, Template } from "aws-cdk-lib/assertions";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import { type Construct } from "constructs";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { RealtimeStack } from "../lib/realtime-stack.js";
 
@@ -196,5 +196,58 @@ describe("RealtimeStack — replay", () => {
       FunctionName: "F1-WS-Replay",
       Timeout: 900,
     });
+  });
+});
+
+describe("RealtimeStack — IAM least privilege (T7)", () => {
+  // Actions that must never be granted on Resource "*" (Constitution VII).
+  const HOT_PREFIXES = [
+    "dynamodb:",
+    "s3:GetObject",
+    "s3:PutObject",
+    "execute-api:ManageConnections",
+    "lambda:InvokeFunction",
+  ];
+  const asArray = <T>(v: T | T[]): T[] => (Array.isArray(v) ? v : [v]);
+  const isHot = (action: unknown): boolean =>
+    typeof action === "string" && HOT_PREFIXES.some((p) => action.startsWith(p));
+
+  it("never grants a hot-path action on Resource '*'", () => {
+    const policies = synth().findResources("AWS::IAM::Policy");
+    const offenders: string[] = [];
+    for (const [id, policy] of Object.entries(policies)) {
+      const statements = policy.Properties?.PolicyDocument?.Statement ?? [];
+      for (const st of statements) {
+        const actions = asArray(st.Action);
+        const resources = asArray(st.Resource);
+        if (actions.some(isHot) && resources.some((r: unknown) => r === "*")) {
+          offenders.push(`${id}: ${actions.join(",")}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("provisions exactly the five F1-WS-* application lambdas", () => {
+    const fns = synth().findResources("AWS::Lambda::Function");
+    const names = Object.values(fns)
+      .map((f) => f.Properties?.FunctionName)
+      .filter((n): n is string => typeof n === "string" && n.startsWith("F1-WS-"))
+      .sort();
+    expect(names).toEqual([
+      "F1-WS-Connect",
+      "F1-WS-Disconnect",
+      "F1-WS-Fanout",
+      "F1-WS-Replay",
+      "F1-WS-Subscribe",
+    ]);
+  });
+
+  it("wires all five WebSocket routes", () => {
+    const routes = synth().findResources("AWS::ApiGatewayV2::Route");
+    const keys = Object.values(routes)
+      .map((r) => r.Properties?.RouteKey)
+      .sort();
+    expect(keys).toEqual(["$connect", "$disconnect", "replay:start", "replay:stop", "subscribe"]);
   });
 });

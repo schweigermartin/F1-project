@@ -67,10 +67,10 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Verify:** 11 Handler-Tests (expandLines sort/skip/entity-mapping; not-archived; full-play→replay:end; **Speed-Skalierung 1×/2×/4×** via gepinnter Clock; Cursor-Continuation bei Budget 0; Resume-ab-Cursor; Abort-Stop; 410-gone; real-error-rethrow) + 3 Stack-Assertions (replay:start/stop-Routen, S3-List+self-Invoke-IAM, 900s-Timeout) → **104 infra-Tests grün**. `cdk synth` + typecheck/lint/format grün.
 - **Notes:** **Replay-Pfad steht** (Constitution V). Backend ist damit komplett — ab T9 Frontend.
 
-### T7 — Wiring + IAM (least privilege)
+### T7 — Wiring + IAM (least privilege) — DONE
 
-- **Output:** Alle Lambdas als `NodejsFunction` (ESM/ARM64, `@aws-sdk/*` extern). Route-Integrationen, Stream-EventSource, `execute-api:ManageConnections` je posting-Lambda auf die WS-API-ARN, S3-`GetObject` (replay), DDB-Grants scoped, replay-self-`InvokeFunction`. Keine `*`-Policies (Constitution VII).
-- **Verify:** `cdk synth` grün, alle Realtime-Assertion-Tests grün, IAM-Policies im Template scoped (Test prüft keine Wildcard-Resource auf den heißen Pfaden).
+- **Output:** Das Wiring (Routen, Stream-EventSource, scoped Grants) wurde bereits in T2–T6 mitgebaut; T7 verifiziert + verriegelt es. Review-Befund: **0 Wildcard-Resources** auf Hot-Path-Actions — alle 5 Lambdas haben getrennte Rollen mit scoped Policies (Connect PutItem, Disconnect DeleteItem, Subscribe read-F1Live+UpdateItem-Conn+ManageConnections, Fanout stream-read+Scan/Delete-Conn+ManageConnections, Replay GetObject/List-S3+GetItem/UpdateItem-Conn+ManageConnections+self-Invoke). Kein Nachschärfen nötig.
+- **Verify:** 3 neue Guard-Tests: (1) kein Hot-Path-Action (`dynamodb:`/`s3:GetObject`/`s3:PutObject`/`execute-api:ManageConnections`/`lambda:InvokeFunction`) auf `Resource:"*"` (iteriert alle `AWS::IAM::Policy`), (2) genau die 5 `F1-WS-*`-Lambdas, (3) genau 5 WS-Routen (`$connect`/`$disconnect`/`subscribe`/`replay:start`/`replay:stop`). → **107 infra-Tests grün**. `cdk synth` + typecheck/lint/format grün.
 
 ### T8 — WebSocket-Auth (Authorizer + Token)
 

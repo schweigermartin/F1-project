@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 F1 portfolio monorepo with two systems sharing one AWS data pipeline:
+
 1. **Live Telemetry Dashboard** — event-driven AWS pipeline ingesting OpenF1 data → DynamoDB/S3 → (future) WebSocket → React.
 2. **Race Outcome Predictor** — XGBoost model on historical + archived data, with Bedrock (Claude) natural-language explanations.
 3. **Feedback Loop** — predictions vs. actuals → hit-rate → re-training.
@@ -38,6 +39,7 @@ pnpm build
 ```
 
 Single workspace / single test:
+
 ```bash
 pnpm -F @f1/shared test          # one workspace's tests
 pnpm -F @f1/infra test
@@ -47,6 +49,7 @@ pnpm -F @f1/infra vitest run -t "DLQ"                           # single test by
 ```
 
 CDK (infra), needs AWS creds — `AWS_PROFILE` from your `.env`:
+
 ```bash
 AWS_PROFILE=<profile> pnpm -F @f1/infra cdk synth
 AWS_PROFILE=<profile> pnpm -F @f1/infra cdk diff
@@ -67,6 +70,7 @@ pnpm workspaces: `apps/*`, `infra`, `packages/*`. The `ml/` dir is **not** in th
 ## Architecture essentials
 
 **Two CDK stacks** (`infra/bin/app.ts`):
+
 - `DataLayerStack` (Phase 0) — the S3 bucket. `RemovalPolicy.RETAIN` — it holds the only copy of the live archive; a stack destroy must never delete it.
 - `PipelineStack` (Phase 1) — everything else: DynamoDB `F1Live` (single-table, TTL, Streams, on-demand), SQS `F1-Events` + DLQ, 4 Lambdas, EventBridge rules, SNS alerts, CloudWatch dashboard + alarms.
 
@@ -81,7 +85,7 @@ pnpm workspaces: `apps/*`, `infra`, `packages/*`. The `ml/` dir is **not** in th
 ## Conventions & gotchas
 
 - **TypeScript ESM everywhere** — `"type": "module"`, `moduleResolution: NodeNext`. Relative imports need the `.js` extension even from `.ts` source (e.g. `import ... from "./ddb-keys.js"`).
-- **Strict tsconfig** (`tsconfig.base.json`): no `any`, no `@ts-ignore` without a justifying comment (Constitution VI), `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`. The infra workspace is the *only* place `exactOptionalPropertyTypes` is disabled — required by CDK's `IBucket`/`IFunction` interfaces; all other strictness stays on.
+- **Strict tsconfig** (`tsconfig.base.json`): no `any`, no `@ts-ignore` without a justifying comment (Constitution VI), `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`. The infra workspace is the _only_ place `exactOptionalPropertyTypes` is disabled — required by CDK's `IBucket`/`IFunction` interfaces; all other strictness stays on.
 - **Imports are auto-sorted** by `simple-import-sort` (eslint error). Type imports must use inline `import { type X }`.
 - **`no-console` is warn** repo-wide but **off** in `infra/lambda/**` — Lambdas log to CloudWatch via `console`. Lambda logging should be structured JSON (Constitution VIII).
 - Lambdas: Node 20, ARM64, ESM bundle via esbuild, `@aws-sdk/*` marked external (provided by the runtime — don't bundle it).

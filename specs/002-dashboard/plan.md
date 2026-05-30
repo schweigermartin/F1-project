@@ -20,7 +20,7 @@ Ein neuer Stack `RealtimeStack` (`F1-Realtime`) hängt an die in Phase 1 gebaute
     │           │              │
     ▼           ▼              ▼
  connect λ   subscribe λ    replay λ ──────► reads S3 raw/sessions/*.jsonl
- disconnect  (snapshot из    (paced push,        (own clock, speed 1/2/4×,
+ disconnect  (snapshot aus   (paced push,        (own clock, speed 1/2/4×,
  λ           F1Live DDB)      self-continuation)   self-reinvoke on cursor)
     │           │              │
     └─────┬─────┘              │ posts via @connections (ApiGwMgmt API)
@@ -169,15 +169,15 @@ Dashboard `f1-pipeline` um eine Realtime-Reihe erweitern (Connections, Fanout-La
 
 Annahme: 20 Renn-Wochenenden × ~6h aktive Sessions = 120h/Jahr Live; außerhalb gelegentliche Replays + Vercel-Idle.
 
-| Service                       | Posten                                                       | €/Jahr                |
-| ----------------------------- | ----------------------------------------------------------- | --------------------- |
-| API GW WebSocket — Messages   | ~432k delta-Posts/Live-Jahr × wenige Connections            | ~0,80                 |
-| API GW WebSocket — Conn-Min   | wenige gleichzeitige Demo-Connections                       | ~0,20                 |
-| Lambda (fanout)               | 1 Invoke/Stream-Batch, ARM64                                | ~0,40                 |
-| Lambda (replay/subscribe/auth)| sporadisch, durch Demo-Nutzung getrieben                    | ~0,30                 |
-| DynamoDB `F1Connections`      | kleine Put/Delete/Scan-Last                                 | ~0,20                 |
-| Vercel                        | Hobby-Tier (Portfolio)                                       | 0 (Free)              |
-| **Gesamt**                    |                                                             | **~1,90 €/Jahr**      |
+| Service                        | Posten                                           | €/Jahr           |
+| ------------------------------ | ------------------------------------------------ | ---------------- |
+| API GW WebSocket — Messages    | ~432k delta-Posts/Live-Jahr × wenige Connections | ~0,80            |
+| API GW WebSocket — Conn-Min    | wenige gleichzeitige Demo-Connections            | ~0,20            |
+| Lambda (fanout)                | 1 Invoke/Stream-Batch, ARM64                     | ~0,40            |
+| Lambda (replay/subscribe/auth) | sporadisch, durch Demo-Nutzung getrieben         | ~0,30            |
+| DynamoDB `F1Connections`       | kleine Put/Delete/Scan-Last                      | ~0,20            |
+| Vercel                         | Hobby-Tier (Portfolio)                           | 0 (Free)         |
+| **Gesamt**                     |                                                  | **~1,90 €/Jahr** |
 
 Steady State ohne Session/Connection ≈ 0 € (AC-8): keine offene Verbindung → keine Conn-Minuten, Fanout idle (kein Stream-Verkehr), Vercel statisch. Bleibt klar im 5-USD/Monat-Budget (Constitution IV).
 

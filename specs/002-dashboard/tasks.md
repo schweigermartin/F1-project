@@ -72,10 +72,14 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Output:** Das Wiring (Routen, Stream-EventSource, scoped Grants) wurde bereits in T2–T6 mitgebaut; T7 verifiziert + verriegelt es. Review-Befund: **0 Wildcard-Resources** auf Hot-Path-Actions — alle 5 Lambdas haben getrennte Rollen mit scoped Policies (Connect PutItem, Disconnect DeleteItem, Subscribe read-F1Live+UpdateItem-Conn+ManageConnections, Fanout stream-read+Scan/Delete-Conn+ManageConnections, Replay GetObject/List-S3+GetItem/UpdateItem-Conn+ManageConnections+self-Invoke). Kein Nachschärfen nötig.
 - **Verify:** 3 neue Guard-Tests: (1) kein Hot-Path-Action (`dynamodb:`/`s3:GetObject`/`s3:PutObject`/`execute-api:ManageConnections`/`lambda:InvokeFunction`) auf `Resource:"*"` (iteriert alle `AWS::IAM::Policy`), (2) genau die 5 `F1-WS-*`-Lambdas, (3) genau 5 WS-Routen (`$connect`/`$disconnect`/`subscribe`/`replay:start`/`replay:stop`). → **107 infra-Tests grün**. `cdk synth` + typecheck/lint/format grün.
 
-### T8 — WebSocket-Auth (Authorizer + Token)
+### T8 — WebSocket-Auth (Authorizer + Token) — DONE
 
-- **Output:** `ConnectAuthorizer λ` (REQUEST) an `$connect`: Origin-Allowlist + HMAC-Token-Check, Secret aus SSM. Next.js-Route-Handler `/api/ws-token` signiert kurzlebige Tokens. `WS_TOKEN_SECRET` in SSM (SecureString), in Vercel-Env gespiegelt.
-- **Verify:** Unit — gültiges/abgelaufenes/fehlendes Token, fremder Origin → Deny. Manuell: Connect ohne Token wird abgelehnt.
+- **Output:**
+  - `@f1/shared/ws-token.ts` (separater Subpath via `exports`-Map, **nicht** aus `index.ts` re-exportiert → `node:crypto` bleibt aus dem Browser-Bundle): `signWsToken`/`mintWsToken` (HMAC-SHA256 `<exp>.<sig>`, 60s TTL) + `verifyWsToken` (timing-safe, Gründe malformed/bad-signature/expired). Geteilter Vertrag für Authorizer **und** den Next.js-Signier-Endpoint (T9).
+  - `ws-authorizer λ` (`handler.ts` pure DI + `index.ts`): `authorizeConnect` prüft Origin-Allowlist (exakt oder `*.suffix`) **vor** dem Token (`verifyWsToken`). `index.ts` liest das Secret aus SSM (WithDecryption, warm-cached), liefert die IAM-Policy-Antwort (WS-Authorizer brauchen Policy-Shape, nicht `isAuthorized`).
+  - Stack: `WebSocketLambdaAuthorizer` (REQUEST, identitySource `route.request.querystring.token`) an `$connect`. `ssm:GetParameter` nur auf `/f1/ws-token-secret`. `allowedOrigins`-Prop. Neue Dep `@aws-sdk/client-ssm`.
+- **Verify:** 5 Token-Tests in shared (mint/verify, expired, falsches Secret, manipuliertes exp, malformed) + 6 Authorizer-Handler-Tests (Origin exakt/Wildcard/Look-alike/missing; allow; Deny-Origin-vor-Token; missing/expired Token) + 2 Stack-Assertions (REQUEST-Authorizer auf `$connect` CUSTOM, scoped SSM-Grant) → **115 infra + 63 shared grün**. `cdk synth` + typecheck (alle 4 Workspaces) + lint/format grün. esbuild bündelt den `@f1/shared/ws-token`-Subpath sauber.
+- **Notes:** Das Secret wird **out-of-band** angelegt (nie im Template, Constitution VII): `aws ssm put-parameter --name /f1/ws-token-secret --type SecureString --value <random>` — gehört in den T14-Deploy-Runbook. **Backend Phase 2 ist damit komplett — ab T9 Frontend.**
 
 ### T9 — Frontend-Scaffold (`apps/dashboard`)
 

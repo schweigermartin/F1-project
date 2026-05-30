@@ -111,6 +111,28 @@ describe("RealtimeStack — WebSocket API", () => {
     });
   });
 
+  it("gates $connect with a REQUEST lambda authorizer on the token", () => {
+    const t = synth();
+    t.hasResourceProperties("AWS::ApiGatewayV2::Authorizer", {
+      AuthorizerType: "REQUEST",
+      IdentitySource: ["route.request.querystring.token"],
+    });
+    t.hasResourceProperties("AWS::ApiGatewayV2::Route", {
+      RouteKey: "$connect",
+      AuthorizationType: "CUSTOM",
+    });
+  });
+
+  it("grants the authorizer ssm:GetParameter on the token secret only", () => {
+    synth().hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({ Action: "ssm:GetParameter", Effect: "Allow" }),
+        ]),
+      }),
+    });
+  });
+
   it("grants connect PutItem and disconnect DeleteItem only (least privilege)", () => {
     const t = synth();
     t.hasResourceProperties("AWS::IAM::Policy", {
@@ -228,13 +250,14 @@ describe("RealtimeStack — IAM least privilege (T7)", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("provisions exactly the five F1-WS-* application lambdas", () => {
+  it("provisions exactly the six F1-WS-* application lambdas", () => {
     const fns = synth().findResources("AWS::Lambda::Function");
     const names = Object.values(fns)
       .map((f) => f.Properties?.FunctionName)
       .filter((n): n is string => typeof n === "string" && n.startsWith("F1-WS-"))
       .sort();
     expect(names).toEqual([
+      "F1-WS-Authorizer",
       "F1-WS-Connect",
       "F1-WS-Disconnect",
       "F1-WS-Fanout",

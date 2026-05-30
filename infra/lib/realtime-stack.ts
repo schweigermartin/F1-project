@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { CONN_PK_ATTR, CONN_SK_ATTR, CONN_TTL_ATTR } from "@f1/shared";
 import { ArnFormat, Duration, RemovalPolicy, Stack, type StackProps, Tags } from "aws-cdk-lib";
 import { WebSocketApi, WebSocketStage } from "aws-cdk-lib/aws-apigatewayv2";
+import { WebSocketLambdaAuthorizer } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { WebSocketLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { type ITableV2 } from "aws-cdk-lib/aws-dynamodb";
@@ -18,11 +19,20 @@ import { type Construct } from "constructs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const lambdaDir = (sub: string): string => path.resolve(__dirname, "..", "lambda", sub);
 
+/**
+ * SSM SecureString holding the WS token HMAC secret. Created out-of-band
+ * (never in the template, Constitution VII):
+ *   aws ssm put-parameter --name /f1/ws-token-secret --type SecureString --value <random>
+ */
+const WS_TOKEN_SECRET_PARAM = "/f1/ws-token-secret";
+
 export interface RealtimeStackProps extends StackProps {
   /** F1Live table from PipelineStack — its stream feeds the fanout λ (T5). */
   readonly liveTable: ITableV2;
   /** Shared data bucket — the replay λ reads archived sessions from it (T6). */
   readonly dataBucket: IBucket;
+  /** Origin allowlist for the $connect authorizer (exact or `*.suffix`). */
+  readonly allowedOrigins?: string[];
 }
 
 /**
@@ -53,6 +63,7 @@ export class RealtimeStack extends Stack {
   readonly webSocketStage: WebSocketStage;
   readonly connectFn: lambda.IFunction;
   readonly disconnectFn: lambda.IFunction;
+  readonly authorizerFn: lambda.IFunction;
   readonly subscribeFn: lambda.IFunction;
   readonly fanoutFn: lambda.IFunction;
   readonly replayFn: lambda.Function;
@@ -125,14 +136,47 @@ export class RealtimeStack extends Stack {
       }),
     );
 
+    // ─── $connect authorizer λ ────────────────────────────────────────────
+    // Anti-abuse gate (Constitution VII): origin allowlist + short-lived HMAC
+    // token. The secret lives in SSM as a SecureString, created out-of-band
+    // (never in the template) and read with decryption at runtime.
+    this.authorizerFn = new NodejsFunction(this, "WsAuthorizerFn", {
+      functionName: "F1-WS-Authorizer",
+      entry: path.join(lambdaDir("ws-authorizer"), "index.ts"),
+      handler: "handler",
+      ...lambdaDefaults,
+      memorySize: 256,
+      environment: {
+        WS_TOKEN_SECRET_PARAM: WS_TOKEN_SECRET_PARAM,
+        ALLOWED_ORIGINS: props.allowedOrigins?.join(",") ?? "http://localhost:3000",
+      },
+    });
+    this.authorizerFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["ssm:GetParameter"],
+        resources: [
+          Stack.of(this).formatArn({
+            service: "ssm",
+            resource: "parameter",
+            // SSM parameter ARNs drop the leading slash of the name.
+            resourceName: WS_TOKEN_SECRET_PARAM.replace(/^\//, ""),
+          }),
+        ],
+      }),
+    );
+
+    const authorizer = new WebSocketLambdaAuthorizer("ConnectAuthorizer", this.authorizerFn, {
+      identitySource: ["route.request.querystring.token"],
+    });
+
     // ─── WebSocket API ────────────────────────────────────────────────────
     // Route selection on $request.body.action (CDK default) drives the
-    // custom routes (subscribe / replay) added in T4+. $connect auth lands
-    // in T8.
+    // custom routes (subscribe / replay). $connect is gated by the authorizer.
     this.webSocketApi = new WebSocketApi(this, "RealtimeApi", {
       apiName: "F1-Realtime",
       connectRouteOptions: {
         integration: new WebSocketLambdaIntegration("ConnectIntegration", this.connectFn),
+        authorizer,
       },
       disconnectRouteOptions: {
         integration: new WebSocketLambdaIntegration("DisconnectIntegration", this.disconnectFn),

@@ -50,9 +50,9 @@ def fetch_json(url: str) -> object:
 
 def find_last_completed_race() -> int:
     """Return the session_key of the most recent completed race for the current year."""
-    year = dt.datetime.now(dt.timezone.utc).year
+    year = dt.datetime.now(dt.UTC).year
     sessions = fetch_json(f"{OPENF1_BASE}/sessions?year={year}")
-    now = dt.datetime.now(dt.timezone.utc)
+    now = dt.datetime.now(dt.UTC)
     completed_races = [
         s
         for s in sessions
@@ -122,7 +122,7 @@ def main() -> None:
     if not sessions_blob:
         sys.exit(f"Session {session_key} not found.")
     write_json(target_dir / "session.json", sessions_blob[0])
-    print(f"  session: meta written")
+    print("  session: meta written")
 
     for ep in DATA_ENDPOINTS:
         try:

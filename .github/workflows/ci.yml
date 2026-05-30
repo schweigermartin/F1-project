@@ -69,15 +69,21 @@ jobs:
           CDK_DEFAULT_ACCOUNT: "128663321407"
           CDK_DEFAULT_REGION: eu-central-1
 
-  python-lint:
-    name: Python lint (skipped until ml/ has code)
+  python:
+    name: Python (ruff + mypy + pytest)
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    if: false # flip to true in Phase 3 when ml/ has sources
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install ruff
-      - run: ruff check ml/
+          cache: pip
+      - name: Install ml workspace + dev tools
+        run: pip install -e "./ml[dev]"
+      - name: Ruff
+        run: ruff check ml/
+      - name: mypy
+        run: mypy --config-file ml/pyproject.toml ml/src
+      - name: Pytest
+        run: pytest ml/

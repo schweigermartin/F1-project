@@ -20,8 +20,13 @@ __pycache__/
 .venv/
 venv/
 .ipynb_checkpoints/
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 
 .fastf1-cache/
+ml/artifacts/
 
 .DS_Store
 .vscode/

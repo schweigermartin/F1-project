@@ -13,10 +13,14 @@ Reihenfolge bewusst: Setup → Layout/Schema → Target/Split → Feature-Pipeli
 
 ## Aufgaben
 
-### T1 — Python-Workspace-Setup (`ml/`)
+### T1 — Python-Workspace-Setup (`ml/`) — DONE
 
-- **Output:** `ml/pyproject.toml` (oder `requirements.txt` + `ruff.toml`/`mypy.ini`) mit **gepinnten** Deps (fastf1, pandas, scikit-learn, xgboost, shap, boto3, pytest, ruff, mypy). Package-Layout `ml/src/f1pred/__init__.py` + `ml/tests/`. `.fastf1-cache/`/`ml/artifacts/` gitignored (Cache schon ignoriert). CI `python-lint`-Job in `.github/workflows/ci.yml` aktiviert (`if: false` → `true`; `ruff check ml/` + `mypy` + `pytest`).
-- **Verify:** `ruff check ml/`, `mypy ml/src`, `pytest ml/` (leer → grün) lokal; CI-Job läuft grün.
+- **Output:**
+  - `ml/pyproject.toml` (hatchling, src-Layout) mit gepinnten Deps (fastf1, pandas, scikit-learn, xgboost, shap, boto3, pydantic, matplotlib) + `[dev]` (pytest, mypy, ruff, moto, pandas-stubs) + ruff/mypy(strict)/pytest-Config.
+  - `ml/src/f1pred/__init__.py` (`__version__`), `ml/tests/test_smoke.py` (nicht-leere Suite → pytest exitet sonst mit 5).
+  - CI-Job `python` (ehem. `python-lint`, `if:false` entfernt): `pip install -e ./ml[dev]` → ruff + mypy + pytest, timeout 15, pip-Cache.
+  - `.gitignore`: `ml/artifacts/`, `*.egg-info/`, `.mypy_cache/`/`.pytest_cache/`/`.ruff_cache/` (`.venv`/`.fastf1-cache` schon da). `ml/README.md` aktualisiert.
+- **Verify:** lokal (venv) `ruff check .` + `mypy src` + `pytest` → grün. Bei der Gelegenheit 3 Ruff-Findings im Phase-1-`fetch_fixtures.py` autofixed (`datetime.UTC`, f-string). JS/TS-Gates unberührt (eslint ignoriert `ml/**`, prettier clean).
 
 ### T2 — S3-Layout + Feature-Schema
 

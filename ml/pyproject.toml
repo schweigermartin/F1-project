@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "f1pred"
+version = "0.0.0"
+description = "F1 podium predictor — XGBoost model on FastF1 history (Phase 3)."
+requires-python = ">=3.12"
+dependencies = [
+  # Pinned at the minor level for reproducibility (Constitution IX); a frozen
+  # lockfile (pip freeze) is captured at the real training run (T12).
+  "fastf1~=3.4",
+  "pandas~=2.2",
+  "scikit-learn~=1.5",
+  "xgboost~=2.1",
+  "shap~=0.46",
+  "boto3~=1.35",
+  "pydantic~=2.9",
+  "matplotlib~=3.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest~=8.3", "mypy~=1.13", "ruff~=0.8", "moto~=5.0", "pandas-stubs~=2.2"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/f1pred"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+strict = true
+# FastF1 / shap ship without complete type stubs; don't fail on their imports.
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

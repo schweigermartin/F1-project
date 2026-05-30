@@ -38,6 +38,10 @@ export function useRaceSocket(): RaceSocketControls {
   const ref = useRef<RaceSocket | null>(null);
 
   useEffect(() => {
+    // No backend configured (local/preview demo) → don't open a doomed socket;
+    // the Dashboard seeds canned data instead.
+    if (!process.env["NEXT_PUBLIC_WS_URL"]) return;
+
     const store = useRaceStore.getState();
     const socket = createRaceSocket({
       fetchToken: async () => {

@@ -99,10 +99,14 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Verify:** 13 Vitest-Tests ohne DOM (Fake-WebSocket + injizierter Timer): Store (snapshot/merge/delta/weather/no-driver-skip, monotone stint/lap) + Controller (Connect+Token-URL+subscribe-on-open, valid-vs-invalid-Frame AC-6, Reconnect+Re-Subscribe < 5s AC-4, Backoff-Wachstum 250→3000-cap, kein Reconnect nach `close()`). `pnpm -F @f1/dashboard test`/`typecheck`/`build` + Root-`lint`/`format` grün.
 - **Notes:** Kern-Logik bewusst DOM-frei getestet (Controller-DI + pure Store) → kein Testing-Library/jsdom-Setup nötig; der Hook ist der dünne Wrapper.
 
-### T11 — visx-Visualisierungen
+### T11 — visx-Visualisierungen — DONE
 
-- **Output:** `TimingTower` (Reihenfolge/Gap/Reifen/letzte Runde je Fahrer), `PositionChart` (visx, Position über Runden), `WeatherStrip`, `ConnectionStatus`. Responsives Layout.
-- **Verify:** Lokal gegen einen Mock-Socket (gespeicherte Snapshot+delta-Sequenz aus Fixtures) — Tower aktualisiert ohne Refresh, Reihenfolge stimmt. Komponenten < 200 Zeilen (Martins Konvention).
+- **Output:**
+  - `TimingTower` (Pos/Driver/Gap/Interval/Reifen-Badge+Alter/letzte Runde), `GapChart` (visx — horizontale Balken Rückstand-zum-Leader, nach Position sortiert, gelappte Fahrer markiert), `WeatherStrip` (Luft/Strecke/Feuchte/Wind/Regen), `ConnectionStatus` (Ampel + Live/Replay-Badge). `Dashboard.tsx` (`'use client'`) verdrahtet Hook+Store+Komponenten im responsiven Grid; `page.tsx` rendert es.
+  - Pure Daten-Aufbereitung in `src/lib/format.ts` (`sortedDrivers`, `formatGap`, `formatLapTime`, `tyreInfo`, `gapChartData`) — getrennt von den Komponenten, DOM-frei getestet.
+  - `demo-data.ts` + Seed: ohne `NEXT_PUBLIC_WS_URL` zeigt `next dev`/Preview eine gefüllte Demo (Constitution V), statt zu verbinden.
+- **Verify:** 5 pure Format-Tests (Ordering nulls-last, Gap-/LapTime-Format, Reifen-Mapping, gapChartData inkl. lapped-an-max) → **18 dashboard-Tests grün**. `build`/`typecheck` + Root-`lint`/`format` grün. Komponenten alle < 100 Zeilen.
+- **Notes:** **Abweichung vom Plan:** statt „PositionChart (Position über Runden)" ein **GapChart** — der Store hält nur den aktuellen Zustand, keine Per-Runden-Historie; der Gap-Balken ist datentreu aus dem Modell (Per-Runden-Verlauf bräuchte einen History-Buffer → mögliche spätere Erweiterung). **Build-Fallstrick:** Turbopack rewritet NodeNext-`.js`-Endungen in `@f1/shared`-Source nicht → Build auf webpack + `resolve.extensionAlias` umgestellt (`next build --webpack`).
 
 ### T12 — Replay-UI
 

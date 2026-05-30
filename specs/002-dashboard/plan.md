@@ -88,7 +88,7 @@ Ein neuer Stack `RealtimeStack` (`F1-Realtime`) hängt an die in Phase 1 gebaute
 ### 8. Frontend (`apps/dashboard`)
 
 - **Verantwortung:** Next.js (App Router) auf Vercel. `useRaceSocket`-Hook hält die WS-Verbindung (Reconnect mit Backoff < 5s), Zustand-Store hält das normalisierte Renn-Modell, visx rendert.
-- **Komponenten-Baum:** `RacePage` → `TimingTower` (Reihenfolge/Gap/Reifen je Fahrer), `PositionChart` (visx, Position über Runden), `WeatherStrip`, `ReplayControls` (Toggle + 1×/2×/4×), `ConnectionStatus`.
+- **Komponenten-Baum:** `RacePage` → `Dashboard` → `TimingTower` (Reihenfolge/Gap/Reifen je Fahrer), `GapChart` (visx — Rückstand-zum-Leader-Balken; T11-Entscheidung statt „Position über Runden", da der Store keine Per-Runden-Historie hält), `WeatherStrip`, `ReplayControls` (Toggle + 1×/2×/4×, T12), `ConnectionStatus`.
 - **Failure-Mode:** Socket zu → Auto-Reconnect + Re-`subscribe` (stellt Snapshot wieder her, AC-4). Ungültige `ServerMessage` → verwerfen + `console.warn` (AC-6).
 
 ## Datenmodelle

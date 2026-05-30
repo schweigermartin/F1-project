@@ -1,7 +1,7 @@
 # Plan: Foundation
 
 > **Spec:** [spec.md](./spec.md)
-> **Status:** approved
+> **Status:** done
 
 ## Architektur
 

@@ -1,7 +1,7 @@
 # Tasks: Foundation
 
 > **Plan:** [plan.md](./plan.md)
-> **Status:** ready
+> **Status:** done
 
 Reihenfolge ist relevant — Abhängigkeiten markiert. Jeder Task = ein Commit (atomar).
 

@@ -1,7 +1,7 @@
 # Spec: Foundation
 
 > **Phase:** 000
-> **Status:** spec-ready
+> **Status:** done
 > **Owner:** Martin
 > **Constitution:** alle Artikel aktiv. Diese Phase begründet I (Spec-First), III (Geteilte Basis), IV (Kostenkontrolle) und XII (README).
 

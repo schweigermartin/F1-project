@@ -8,6 +8,75 @@ Zwei zusammenhängende Systeme, die eine gemeinsame Datenpipeline teilen:
 2. **Race Outcome Predictor** — ML-Modell (XGBoost/LightGBM) auf historischen FastF1- und live archivierten Daten, mit Bedrock-basierter natürlichsprachlicher Begründung. Demonstriert ML-Skills (Feature Engineering, Training, Evaluation, Inference, LLM-Integration).
 3. **Feedback Loop** — verbindet beide: Vorhersagen vs. tatsächliche Ergebnisse → Trefferquote → Re-Training. Macht aus zwei Projekten ein System.
 
+## Architektur
+
+`✅` = deployed · `🛠️` = in Arbeit / Code da · `📋` = nur Spec, noch kein Code
+
+```
+                         ┌──────────────┐
+                         │  OpenF1 API  │ 📋 (Phase 1)
+                         └──────┬───────┘
+                                │ poll (5s, nur während Sessions)
+                                ▼
+                       ┌─────────────────┐
+                       │  Poller Lambda  │ 📋
+                       └────────┬────────┘
+                                │
+                                ▼
+                       ┌──────────────────┐
+                       │  SQS + DLQ       │ 📋
+                       └────────┬─────────┘
+                                │
+                                ▼
+                       ┌──────────────────┐         ┌────────────────────┐
+                       │ Consumer Lambda  │────────▶│ S3 (raw archive)   │ ✅ Bucket live
+                       └────────┬─────────┘         │ models/<semver>/   │     in eu-central-1
+                                │                   └─────────┬──────────┘
+                                ▼                             │
+                       ┌──────────────────┐                   │
+                       │  DynamoDB        │ 📋 (Phase 1)      │
+                       │  (TTL 24h)       │                   │
+                       │  + Streams       │                   │
+                       └───┬─────────┬────┘                   │
+                           │         │                        │
+                           │         │ Stream                 │ training data
+                           │         ▼                        ▼
+                           │   ┌──────────────┐         ┌──────────────┐
+                           │   │  WebSocket   │ 📋      │  Training    │ 📋 (Phase 3)
+                           │   │  API Gateway │ (Ph. 2) │  (FastF1 +   │
+                           │   └──────┬───────┘         │   XGBoost)   │
+                           │          │                 └──────┬───────┘
+                           │          ▼                        │
+                           │   ┌──────────────┐                ▼
+                           │   │ apps/dashbd  │ 📋      ┌──────────────┐
+                           │   │ Next.js, WS  │ (Ph. 2) │ model.json   │
+                           │   └──────────────┘         │ in S3        │
+                           │                            └──────┬───────┘
+                           │ predictions + actuals             │
+                           │ (Feedback Loop, Phase 5)          │
+                           │                                   ▼
+                           │                            ┌──────────────┐
+                           └──────────────────────────▶ │  Inference   │ 📋 (Phase 4)
+                                                        │  Lambda      │
+                                                        │  + Bedrock   │
+                                                        │  (Claude)    │
+                                                        └──────┬───────┘
+                                                               │
+                                                               ▼
+                                                        ┌──────────────┐
+                                                        │ apps/pred.   │ 📋 (Phase 4)
+                                                        │ Next.js,     │
+                                                        │ Bars + LLM   │
+                                                        │ Erklärungen  │
+                                                        └──────────────┘
+
+Querschnitt (alle Phasen):
+- IaC: AWS CDK v2 (TypeScript)              ✅ Skelett + S3-Stack deployed
+- Geteilte Typen: packages/shared (Zod)     ✅ S3-Pfade, später OpenF1-Schemas
+- CI: GitHub Actions (lint+typecheck+synth) ✅ grün auf main
+- Cost-Guards: AWS Budget 5 USD/Monat       ✅ aktiv (50%/100% Alarme)
+```
+
 ## Spec-Driven Development
 
 Dieses Projekt folgt SDD (spec-kit-inspiriert). Workflow:
@@ -25,14 +94,14 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 
 ## Phasen
 
-| #   | Phase                                                      | Status      | Ergebnis                                                          |
-| --- | ---------------------------------------------------------- | ----------- | ----------------------------------------------------------------- |
-| 0   | [Foundation](specs/000-foundation/spec.md)                 | in progress | Monorepo + AWS-Setup + CDK + S3-Layout (deployed in eu-central-1) |
-| 1   | [Data Pipeline](specs/001-data-pipeline/spec.md)           | spec-ready  | OpenF1 → SQS → Lambda → DynamoDB + S3                             |
-| 2   | [Live Dashboard](specs/002-dashboard/spec.md)              | stub        | WebSocket-API + React-Frontend auf Vercel                         |
-| 3   | [ML Model](specs/003-ml-model/spec.md)                     | stub        | XGBoost-Podium-Classifier + SHAP + S3-Artefakt                    |
-| 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md) | stub        | Inference-Lambda + Bedrock-Erklärung + Predictor-Frontend         |
-| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)           | stub        | Hit-Rate-Tracking + optional Re-Training                          |
+| #   | Phase                                                      | Status     | Ergebnis                                                          |
+| --- | ---------------------------------------------------------- | ---------- | ----------------------------------------------------------------- |
+| 0   | [Foundation](specs/000-foundation/spec.md)                 | ✅ done    | Monorepo + AWS-Setup + CDK + S3-Layout (deployed in eu-central-1) |
+| 1   | [Data Pipeline](specs/001-data-pipeline/spec.md)           | spec-ready | OpenF1 → SQS → Lambda → DynamoDB + S3                             |
+| 2   | [Live Dashboard](specs/002-dashboard/spec.md)              | stub       | WebSocket-API + React-Frontend auf Vercel                         |
+| 3   | [ML Model](specs/003-ml-model/spec.md)                     | stub       | XGBoost-Podium-Classifier + SHAP + S3-Artefakt                    |
+| 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md) | stub       | Inference-Lambda + Bedrock-Erklärung + Predictor-Frontend         |
+| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)           | stub       | Hit-Rate-Tracking + optional Re-Training                          |
 
 ## Stack
 

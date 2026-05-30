@@ -22,11 +22,13 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Verify:** 19 neue Vitest-Cases (happy + invalid je Variante, Discriminated-Union greift, lap-string-Gaps, null-Felder). `pnpm -F @f1/shared test` → **56 grün**, `pnpm typecheck` (alle Workspaces) grün, `pnpm format:check` grün.
 - **Notes:** Single Source of Truth (Constitution III/VI) — Infra **und** Frontend importieren von hier.
 
-### T2 — `RealtimeStack`-Skelett + Connections-Table
+### T2 — `RealtimeStack`-Skelett + Connections-Table — DONE
 
-- **Output:** `infra/lib/realtime-stack.ts` mit `RealtimeStackProps` (nimmt `liveTable: ITableV2` + `dataBucket: IBucket` als Cross-Stack-Refs). `F1Connections`-`TableV2` (On-Demand, TTL, PK/SK aus `@f1/shared`). `bin/app.ts` verdrahtet `pipeline.liveTable` + `dataLayer.dataBucket` → `realtime`. Phase=2-Tag.
-- **Verify:** `cdk synth` grün, `cdk list` zeigt `F1-Realtime`. Assertion-Test: Table-Count, TTL, Billing, Tag.
-- **Notes:** `liveTable` muss aus `PipelineStack` als `readonly` exportiert/übergeben werden (Stream-ARN für T5).
+- **Output:**
+  - `infra/lib/realtime-stack.ts` mit `RealtimeStackProps` (nimmt `liveTable: ITableV2` + `dataBucket: IBucket` als Cross-Stack-Refs, beide als `readonly` Felder für T3–T6 gehalten). `F1ConnectionsTable` als `TableV2`: PK/SK über `CONN_PK_ATTR`/`CONN_SK_ATTR` aus `@f1/shared` (Constitution III), On-Demand, TTL auf `expiresAt`, RemovalPolicy DESTROY (ephemer, TTL fängt Staleness). Kein eigener Stream.
+  - `bin/app.ts`: `PipelineStack` jetzt an `const pipeline` gebunden, `RealtimeStack F1-Realtime` verdrahtet `pipeline.liveTable` + `dataLayer.dataBucket`. Phase=2-Tag am Stack.
+- **Verify:** `cdk list` zeigt `F1-DataLayer` / `F1-Pipeline` / `F1-Realtime`. `cdk synth F1-Realtime` grün. 7 Assertion-Tests (PK/SK, Billing, TTL, Name, Removal, Table-Count, Phase-Tag) → **54 infra-Tests grün**. typecheck/lint/format grün.
+- **Notes:** `liveTable` ist in `PipelineStack` bereits `readonly` exponiert (Stream-ARN für T5).
 
 ### T3 — WebSocket-API + Connect/Disconnect
 

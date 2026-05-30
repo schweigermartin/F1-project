@@ -22,10 +22,12 @@ Reihenfolge bewusst: Setup → Layout/Schema → Target/Split → Feature-Pipeli
   - `.gitignore`: `ml/artifacts/`, `*.egg-info/`, `.mypy_cache/`/`.pytest_cache/`/`.ruff_cache/` (`.venv`/`.fastf1-cache` schon da). `ml/README.md` aktualisiert.
 - **Verify:** lokal (venv) `ruff check .` + `mypy src` + `pytest` → grün. Bei der Gelegenheit 3 Ruff-Findings im Phase-1-`fetch_fixtures.py` autofixed (`datetime.UTC`, f-string). JS/TS-Gates unberührt (eslint ignoriert `ml/**`, prettier clean).
 
-### T2 — S3-Layout + Feature-Schema
+### T2 — S3-Layout + Feature-Schema — DONE
 
-- **Output:** `f1pred/layout.py` — Modell-Pfad-Helfer spiegeln `@f1/shared` `S3_PATHS` (`models/<semver>/model.json`, `model_card.md`), mit Verweis auf die TS-Quelle (Single Source, Constitution III). `f1pred/schema.py` — `PodiumFeatures` (pydantic) mit den 6 Feldern + Feature-Reihenfolge als Konstante.
-- **Verify:** Tests: Pfad-Bauer korrekt, Schema lehnt fehlende/typfalsche Felder ab.
+- **Output:**
+  - `f1pred/layout.py` — `model_artifact_key`/`model_card_key`/`bucket_name`, spiegeln `@f1/shared` `S3_PATHS` mit Verweis auf die TS-Quelle (Constitution III).
+  - `f1pred/schema.py` — `FEATURE_NAMES` (6 pre-race-Features, feste Reihenfolge) + `PodiumFeatures` (pydantic, `extra="forbid"`, Ranges auf grid_position/quali_gap).
+- **Verify:** 6 Tests (Pfade == shared-Layout; FEATURE_NAMES == Model-Felder in Reihenfolge; valid akzeptiert; out-of-range grid / negativer Gap / unknown+missing abgelehnt) → ruff + mypy + pytest (8) grün.
 
 ### T3 — Target (`target.py`)
 

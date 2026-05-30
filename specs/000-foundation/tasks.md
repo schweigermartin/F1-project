@@ -28,11 +28,11 @@ Reihenfolge ist relevant — Abhängigkeiten markiert. Jeder Task = ein Commit (
 - **Verify:** Importierbar aus `infra/` als `@f1/shared`.
 - **Constitution:** Artikel III — geteilte Basis.
 
-## T5 — AWS-Account + IAM-User + Budget (manuell)
+## T5 — AWS-Account + Deployer + Budget — DONE (pragmatischer Pfad)
 
-- **Output:** IAM-User `f1-project-deployer` mit Policy aus dem Plan, Access-Keys lokal in `~/.aws/credentials` als Profile `f1-project`. AWS Budget mit Schwellen 50% (Warn) und 100% (Critical) auf `martin@michelberger.digital`.
-- **Verify:** `AWS_PROFILE=f1-project aws sts get-caller-identity` zeigt den User. AWS-Konsole zeigt aktives Budget.
-- **Notes:** Manueller Schritt (kein CDK), weil Bootstrap-Egg-Hen-Problem. **Constitution Artikel IV — Pflicht vor T8.**
+- **Output:** Account `128663321407`, User `Martin-dev` (Profil `private`), Permissions `PowerUserAccess` + `IAMFullAccess` + `AWSBillingReadOnlyAccess`. Budget `F1-Project` mit 5 USD/Monat, Schwellen 50%/100% an `martin_schweiger@outlook.de` per CLI angelegt. Zusätzlich existiert `My Zero-Spend Budget` (1 USD) als First-Line-Defense.
+- **Verify:** `AWS_PROFILE=private aws sts get-caller-identity` → `Martin-dev` ✓. `aws budgets describe-budget --budget-name F1-Project --profile private` → exists ✓.
+- **Notes:** Abweichung von ursprünglichem Plan ("dedizierter `f1-project-deployer` mit Minimal-Policy") dokumentiert in `plan.md` → "Abweichungen von der Constitution". **Constitution Artikel IV erfüllt.**
 
 ## T6 — CDK-Skelett im `infra/`
 

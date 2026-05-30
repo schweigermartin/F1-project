@@ -16,7 +16,7 @@ S3-Bucket, DynamoDB-Schema, IAM-Rollen, CDK-Konventionen werden **einmal** in Ph
 
 ## IV. Kostenkontrolle ist nicht optional
 
-- Budget-Alarm in AWS (Schwellenwert in Phase 0 festlegen, z.B. 5–10 €) ist Pflicht vor dem ersten Lambda-Deploy.
+- Budget-Alarm in AWS ist Pflicht vor dem ersten Lambda-Deploy. Aktuell: `F1-Project`-Budget mit 5 USD/Monat, Notifications bei 50% + 100% an `martin_schweiger@outlook.de`. Zusätzlich Account-weites `My Zero-Spend Budget` als First-Line-Defense.
 - EventBridge-Polling läuft nur während aktiver Sessions, nie 24/7.
 - DynamoDB On-Demand (Lernprojekt-Volumen), TTL auf allem Ephemeren.
 - Bedrock-Calls cachen, nie pro Request neu.

@@ -52,9 +52,10 @@
 
 ### AWS-Account-Schutz (manuell + CDK)
 
-- **Budget-Alarm:** über AWS Budgets (CDK: `aws-budgets.CfnBudget`). Schwellen 50% (Warning Email) und 100% (Critical Email). Empfänger: `martin@michelberger.digital`.
-- **IAM-User:** lokal manuell angelegt (oder via CDK `iam.User`), Policy mit nur den Diensten, die wir nutzen: S3, DynamoDB, Lambda, SQS, EventBridge, CloudWatch, IAM (für CDK-Bootstrap), CloudFormation, Bedrock. Kein `*:*`.
-- **CDK-Bootstrap:** `cdk bootstrap` einmal pro Account/Region (Standard-Trust auf den selbst gerade benutzten User).
+- **Budget-Alarm:** `F1-Project` Budget mit 5 USD/Monat, Schwellen 50% (Warning Email) und 100% (Critical Email). Empfänger: `martin_schweiger@outlook.de`. Per CLI angelegt in Account `128663321407`. Zusätzlich existiert das account-weite `My Zero-Spend Budget` (1 USD Limit, Alarm bei jedem Cent Ausgaben) als First-Line-Defense.
+- **IAM-User:** `Martin-dev` im Account `128663321407` wird wiederverwendet — Permissions: `PowerUserAccess` + `IAMFullAccess` + `AWSBillingReadOnlyAccess`. Pragmatischer Kompromiss für Solo-Lernprojekt (kein dedizierter `f1-project-deployer`-User).
+- **AWS CLI:** Profil `private` zeigt auf den Account. `AWS_PROFILE=private` ist der Standard für lokale Operationen.
+- **CDK-Bootstrap:** `cdk bootstrap aws://128663321407/eu-central-1` einmal vor dem ersten Deploy (T8).
 
 ### S3 Data Layer (CDK Stack `DataLayerStack`)
 
@@ -100,12 +101,10 @@ Keine in Phase 0 (kein OpenF1, kein Bedrock).
 
 ## Security & IAM
 
-- IAM-User-Policy explizit (kein Managed `AdministratorAccess`):
-  - `s3:*` nur auf den eigenen Bucket-ARN.
-  - `cloudformation:*`, `iam:PassRole` (eingeschränkt auf CDK-Roles), `ssm:GetParameter` (für CDK-Bootstrap-Version).
-  - Service-spezifische Permissions (Lambda, DynamoDB, SQS, EventBridge, Bedrock) werden in Phase 1+ pro Stack via CDK-Konstrukte vergeben — nicht im User selbst.
-- AWS-Credentials lokal in `~/.aws/credentials` als named profile `f1-project`. Niemals im Repo.
-- `.env.example` listet: `AWS_PROFILE=f1-project`, `AWS_REGION=eu-central-1`, `CDK_DEFAULT_ACCOUNT`, `CDK_DEFAULT_REGION`.
+- **Deployer-Identität:** `Martin-dev` im Account `128663321407` (Profil `private`). Permissions = `PowerUserAccess` + `IAMFullAccess` + `AWSBillingReadOnlyAccess`. **Bewusste Abweichung** von "least privilege" — pragmatischer Kompromiss für ein Solo-Lernprojekt. `PowerUserAccess` ist explizit kein Admin (kein IAM-Schreibrecht außer für sich selbst). Wenn das Projekt mal mit echtem Team läuft, wird ein dedizierter `f1-project-deployer`-User mit minimaler Policy nachgezogen.
+- **Service-Permissions (Lambda, DDB, SQS, EventBridge, Bedrock)** werden ab Phase 1 pro Stack via CDK-Rollen vergeben — least privilege gilt für die **deployten Ressourcen**, auch wenn der Deployer breit ist.
+- AWS-Credentials lokal in `~/.aws/credentials` unter dem Profilnamen `private`. Niemals im Repo.
+- `.env.example` listet: `AWS_PROFILE=private`, `AWS_REGION=eu-central-1`, `CDK_DEFAULT_ACCOUNT=128663321407`, `CDK_DEFAULT_REGION=eu-central-1`.
 
 ## Observability
 
@@ -129,4 +128,4 @@ Phase 0 hat noch keine laufenden Services. Vorbereitet:
 
 ## Abweichungen von der Constitution
 
-Keine.
+- **Artikel VII (Security by Default):** Deployer-User nutzt `PowerUserAccess` statt einer dedizierten Minimal-Policy. Pragmatischer Kompromiss für Solo-Lernprojekt. **Mitigation:** Service-Rollen für deployte Ressourcen sind weiterhin least privilege; Account hat zwei Budget-Alarme als Schadensbegrenzung.

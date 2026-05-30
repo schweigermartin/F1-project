@@ -1,7 +1,7 @@
 # Spec: Live Dashboard
 
 > **Phase:** 002
-> **Status:** spec-ready
+> **Status:** implemented (T1–T13); deploy + live-validation (T14–T16) ausstehend
 > **Owner:** Martin
 > **Constitution:** alle Artikel — besonders V (Demo muss jederzeit funktionieren → Replay), VI (Schema-Validierung an Systemgrenzen → WebSocket-Messages), VII (Security by Default → WebSocket-Auth), VIII (Observability).
 

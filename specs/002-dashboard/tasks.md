@@ -1,7 +1,7 @@
 # Tasks: Live Dashboard
 
 > **Plan:** [plan.md](./plan.md)
-> **Status:** ready
+> **Status:** T1–T13 done, T14/T15 prepared (deploy pending), T16 partial
 
 Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Security → Frontend → Deploy/Demo. Backend-Pfade (Live + Replay) müssen stehen, bevor das Frontend etwas anzuzeigen hat.
 
@@ -143,7 +143,8 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Auszuführen (Martin):** `npx playwright install chromium` einmalig, dann lokal `pnpm -F @f1/dashboard test:e2e` (Demo-Modus) bzw. `BASE_URL=<preview> …` gegen den Deploy.
 - **Verify:** kommt mit dem Deploy/lokalen Run. Unit-Suite unverändert grün (21), e2e sauber getrennt.
 
-### T16 — Demo-Check / Phase-2-Abschluss
+### T16 — Demo-Check / Phase-2-Abschluss — TEILWEISE (Rest nach Deploy)
 
-- **Output:** Live-URL + Screenshot im README, Architektur-Diagramm aktualisiert (WS-Pfad jetzt ✅), Phasen-Tabelle `Live Dashboard → ✅`. Spec-/Plan-Status → `done`. `git tag phase-2-done`.
-- **Verify:** Recruiter-Test (Constitution II/XII): jemand öffnet README + URL und versteht in 2 Min, was das Dashboard zeigt — ohne mündliche Erklärung. Replay funktioniert mit mindestens einer archivierten Session.
+- **Erledigt (committet):** README — Architektur-Diagramm (WS-API + Dashboard auf 🛠️ „Code da"), Phasen-Tabelle (`Live Dashboard → 🛠️ code da, Deploy ausstehend`), Stack-Zeile (Next.js+visx+Zustand). Spec-/Plan-Status auf „implemented (T1–T13), Deploy ausstehend".
+- **Offen (nach T14-Deploy):** Live-URL + Screenshot ins README, Diagramm/Tabelle auf ✅, Spec-/Plan-Status `done`, `git tag phase-2-done`.
+- **Verify:** Recruiter-Test (Constitution II/XII) an der Live-URL; Replay mit mindestens einer archivierten Session.

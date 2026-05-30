@@ -1,7 +1,7 @@
 # Plan: Live Dashboard
 
 > **Spec:** [spec.md](./spec.md)
-> **Status:** draft
+> **Status:** implemented (T1–T13); deploy ausstehend (T14, [runbook](../../docs/phase-2-deploy.md))
 
 ## Architektur
 

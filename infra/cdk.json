@@ -1,0 +1,12 @@
+{
+  "app": "tsx bin/app.ts",
+  "watch": {
+    "include": ["bin/**", "lib/**", "lambda/**", "../packages/shared/src/**"],
+    "exclude": ["node_modules", "cdk.out", "dist", "*.tsbuildinfo"]
+  },
+  "context": {
+    "@aws-cdk/aws-iam:minimizePolicies": true,
+    "@aws-cdk/aws-lambda:recognizeVersionProps": true,
+    "@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy": true
+  }
+}

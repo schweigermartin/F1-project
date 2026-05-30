@@ -5,16 +5,23 @@
   "type": "module",
   "description": "AWS CDK infrastructure for the F1 project (Phase 0+).",
   "scripts": {
-    "build": "echo \"infra build placeholder — CDK stacks added in T6+\"",
-    "lint": "echo \"infra lint placeholder\"",
-    "test": "echo \"infra test placeholder\"",
+    "build": "echo \"infra build placeholder — esbuild for lambda assets added in Phase 1 T11\"",
+    "lint": "echo \"infra lint placeholder — covered by root eslint .\"",
+    "test": "echo \"infra test placeholder — snapshot tests added in T11\"",
     "typecheck": "tsc --noEmit",
-    "cdk": "echo \"cdk placeholder — installed in T6\""
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy"
   },
   "devDependencies": {
-    "@types/node": "^22.19.19"
+    "@types/node": "^22.19.19",
+    "aws-cdk": "^2.1125.0",
+    "tsx": "^4.22.3"
   },
   "dependencies": {
-    "@f1/shared": "workspace:*"
+    "@f1/shared": "workspace:*",
+    "aws-cdk-lib": "^2.257.0",
+    "constructs": "^10.6.0"
   }
 }

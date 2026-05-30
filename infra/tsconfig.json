@@ -3,7 +3,12 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "dist",
-    "types": ["node"]
+    "types": ["node"],
+    // CDK's IBucket / IFunction / IRole interfaces declare optional booleans
+    // that the concrete classes implement as `boolean | undefined`, which
+    // breaks `exactOptionalPropertyTypes`. The pattern is unavoidable in
+    // CDK code, so we disable it here only. All other strictness stays on.
+    "exactOptionalPropertyTypes": false
   },
   "include": ["bin/**/*.ts", "lib/**/*.ts", "lambda/**/*.ts", "__tests__/**/*.ts"]
 }

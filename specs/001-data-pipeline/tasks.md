@@ -32,10 +32,11 @@ Reihenfolge bewusst: Schemas → Stacks → Lambdas → Wiring → Live-Test.
   - `packages/shared/__tests__/fixtures.test.ts` — validiert alle 6 Files gegen die T2-Schemas, läuft in CI.
 - **Verify:** 37 Tests grün. Ein echter Schema-Drift wurde entdeckt + gefixt: `segments_sector_*` enthält `null`-Einträge IM Array, nicht nur als ganzer Wert (in `openf1-notes.md` dokumentiert).
 
-## T4 — CDK `PipelineStack` Skelett
+## T4 — CDK `PipelineStack` Skelett — DONE
 
-- **Output:** `infra/lib/pipeline-stack.ts` mit leeren Konstrukten für: DynamoDB Table, SQS Queue + DLQ, alle 4 Lambdas (mit Dummy-Code), EventBridge-Rule. `bin/app.ts` instanziiert den Stack.
-- **Verify:** `cdk synth PipelineStack` läuft.
+- **Output:** `infra/lib/pipeline-stack.ts` mit leerer `PipelineStack`-Klasse + `PipelineStackProps` (nimmt `dataBucket` von `DataLayerStack` als cross-stack Reference). `bin/app.ts` instanziiert den Stack und verdrahtet `dataLayer.dataBucket` → `pipeline.dataBucket`. Phase=1 Tag am Stack.
+- **Verify:** `cdk list` zeigt `F1-DataLayer` + `F1-Pipeline`. `cdk synth --quiet` grün.
+- **Stolperfalle:** `exactOptionalPropertyTypes: true` ist mit CDKs `IBucket`/`IFunction`-Interfaces inkompatibel (`isWebsite: boolean | undefined`). Lokal in `infra/tsconfig.json` ausgeschaltet — alle anderen strict-Flags bleiben an.
 
 ## T5 — DynamoDB Table (Single-Table)
 

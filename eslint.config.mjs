@@ -49,6 +49,14 @@ export default tseslint.config(
     },
   },
 
+  // Lambda handlers legitimately use console.log for CloudWatch Logs.
+  {
+    files: ["infra/lambda/**/*.{ts,js}"],
+    rules: {
+      "no-console": "off",
+    },
+  },
+
   // React rules only for app workspaces
   {
     files: ["apps/**/*.{ts,tsx,jsx}"],

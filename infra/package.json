@@ -16,8 +16,11 @@
     "deploy": "cdk deploy"
   },
   "devDependencies": {
+    "@aws-sdk/client-sqs": "^3.1057.0",
+    "@types/aws-lambda": "^8.10.161",
     "@types/node": "^22.19.19",
     "aws-cdk": "^2.1125.0",
+    "aws-lambda": "^1.0.7",
     "tsx": "^4.22.3",
     "vitest": "^4.1.7"
   },

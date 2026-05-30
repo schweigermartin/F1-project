@@ -51,10 +51,15 @@ Reihenfolge bewusst: Schemas → Stacks → Lambdas → Wiring → Live-Test.
 - **Output:** `EventsQueue` (Standard, 1d retention, 60s visibility timeout, enforceSSL) + `EventsQueueDLQ` (7d retention, enforceSSL). Redrive: `maxReceiveCount=3`. Beide queueNamed (`F1-Events`, `F1-Events-DLQ`).
 - **Verify:** 5 neue Assertion-Tests in `pipeline-stack.test.ts` — Queue-Count, Namen, Retention, Visibility, Redrive-Policy, TLS-Deny via SQS-QueuePolicy. 12 infra tests grün, 49 total.
 
-## T7 — Poller Lambda (Code + Tests)
+## T7 — Poller Lambda (Code + Tests) — DONE
 
-- **Output:** `infra/lambda/poller/index.ts` mit Logik aus Plan §3. Unit-Tests für Backoff, Endpoint-Dispatch, Zod-Validierung.
-- **Verify:** Tests grün. Lokal mit Fixture als HTTP-Mock ausführbar.
+- **Output:**
+  - `infra/lambda/poller/handler.ts` — reine, DI-fähige Logik: sequenzielles Polling (Spike: ~4 RPS Limit), Exp. Backoff mit `Retry-After`-Header (max 3 Versuche), per-Endpoint Zod-Validierung, einzelne SQS-Message pro Endpoint mit `PipelineEvent`-Shape.
+  - `infra/lambda/poller/index.ts` — Lambda-Entrypoint, baut `SQSClient` + `globalThis.fetch` als Deps, strukturiertes JSON-Logging für CloudWatch.
+  - `shouldPollWeather(now)` — stateless 30s-Cadence via `seconds % 30 < 5`, ohne DDB-Roundtrip.
+  - 17 neue Vitest-Tests gegen mocked fetch + sendMessage: happy path (5 Endpoints), Weather-Skip-Cadence, PipelineEvent-Shape, 429-Backoff-Success + Give-Up, Schema-Fail, Network-Error, Endpoint-URL-Helper.
+- **Verify:** 24 infra tests + 37 shared = **61 total**, alle grün.
+- **ESLint:** `no-console: off` für `infra/lambda/**` — Lambdas loggen idiomatisch via `console.log` nach CloudWatch.
 
 ## T8 — Consumer Lambda (Code + Tests)
 

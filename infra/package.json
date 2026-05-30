@@ -13,5 +13,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.19.19"
+  },
+  "dependencies": {
+    "@f1/shared": "workspace:*"
   }
 }

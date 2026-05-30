@@ -41,6 +41,10 @@ importers:
   apps/predictor: {}
 
   infra:
+    dependencies:
+      '@f1/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
     devDependencies:
       '@types/node':
         specifier: ^22.19.19

@@ -57,7 +57,7 @@ Das **Notebook** (`ml/notebooks/train_podium_model.ipynb`) orchestriert diese Mo
   - `constructor_form` (Team-Ø der letzten N Rennen)
   - `track_history` (Ø Endplatz des Fahrers auf diesem Circuit in Vorsaisons)
   - `is_wet` (Regen-Flag aus Wetter/Session-Status)
-- **Failure-Mode:** Zeile mit fehlendem Pflicht-Feature → verworfen (dokumentiert). Form-Features für die ersten N Rennen einer Karriere → NaN → Zeile verworfen oder neutral, im Plan festgelegt (Default: verwerfen für sauberes Signal).
+- **Failure-Mode (festgelegt in T5):** `grid_position`/`quali_gap_to_pole_s`/`is_wet` fehlend **oder** `driver_form`/`constructor_form` NaN (allererstes Rennen → gar keine Historie) → Zeile **verworfen** (kein Signal). `track_history` NaN (Erstbesuch eines Circuits) → mit einem festen **neutralen Konstantwert** (`NEUTRAL_TRACK_HISTORY = 10.0`, ~Midfield) gefüllt statt verworfen — sonst würde jeder Erstbesuch (Rookies/neue Strecken) die Daten dezimieren; der Konstantwert hat keine Datenabhängigkeit → kein Leakage.
 - **Anti-Leakage-Invariante:** die Funktion bekommt **niemals** Renn-Ergebnis-Spalten außer für rolling-Form, die **shifted** (nur Vergangenheit) berechnet wird. Test erzwingt: Feature-Output ändert sich nicht, wenn man die Ergebnis-Spalte des aktuellen Rennens permutiert.
 
 ### 4. Temporal Split (`src/f1pred/split.py`)

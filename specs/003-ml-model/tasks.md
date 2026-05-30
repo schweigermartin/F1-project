@@ -39,10 +39,11 @@ Reihenfolge bewusst: Setup → Layout/Schema → Target/Split → Feature-Pipeli
 - **Output:** `temporal_split(df, *, train_max_year, val_year, test_year, year_col="year")` → frozen `Split(train, val, test)` nach Saison-Jahr, kein Shuffle; `ValueError` wenn Jahre nicht streng steigend.
 - **Verify:** 4 Tests (Zuordnung; Ordnungs-Invariante max(train) < min(test/val); non-increasing → ValueError; fehlende Saison → leerer Frame) → ruff + mypy + pytest (16) grün.
 
-### T5 — Feature-Pipeline (`features.py`)
+### T5 — Feature-Pipeline (`features.py`) — DONE
 
-- **Output:** `build_features(races_df, quali_df)` → Feature-Matrix mit `grid_position`, `quali_gap_to_pole_s`, `driver_form`, `constructor_form`, `track_history`, `is_wet`. Rolling-Form **shifted** (nur Vergangenheit). Zeilen mit fehlenden Pflicht-Features dokumentiert verworfen.
-- **Verify:** Tests (Kern, Constitution X): Determinismus; **Anti-Leakage** (Permutation der aktuellen Ergebnis-Spalte ändert Features nicht); rolling-Form nutzt nur frühere Rennen; fehlende Pflichtfelder → Zeile weg. Fixtures = kleine synthetische Frames, **kein FastF1**.
+- **Output:** `build_features(races, *, window=5)` → Keys + die 6 `FEATURE_NAMES`. `driver_form`/`constructor_form` = `groupby.transform(shift(1).rolling(window).mean())`, `track_history` = `groupby([driver,circuit]).transform(shift(1).expanding().mean())` — `shift(1)` = die Leakage-Garantie. Index erhalten (Target-Alignment). Missing-Policy: grid/quali/is_wet/form fehlend → Zeile weg; `track_history` Erstbesuch → `NEUTRAL_TRACK_HISTORY=10.0` gefüllt (leakage-frei, sonst dezimiert).
+- **Verify:** 7 Tests (Constitution X): Feature-Spalten vorhanden; Determinismus (`assert_frame_equal`); Erstrennen verworfen; `driver_form` nutzt nur Vergangenheit (Wert geprüft); **Anti-Leakage** (Permutation der letzten-Runde-Ergebnisse → Features der Runde unverändert); fehlendes Pflichtfeld → Zeile weg. Synthetische Fixtures, **kein FastF1**. → ruff + mypy (6) + pytest (22) grün.
+- **Notes:** track_history-Neutral-Fill ist eine bewusste Verfeinerung ggü. „Default verwerfen" (Plan §Feature-Pipeline aktualisiert).
 
 ### T6 — Data Layer (`data.py`)
 

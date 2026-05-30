@@ -96,3 +96,21 @@ export function rowToSK(endpoint: string, row: EndpointRow): string | null {
       return null;
   }
 }
+
+/**
+ * Inverse of the SK builders: derive the live-entity kind from an SK. Used by
+ * the fanout λ (Phase 2) to turn a DDB-stream image into a typed `delta`.
+ * Returns `null` for rows that don't map to a pushable entity (e.g. `meta`).
+ *
+ * The returned strings match the DELTA_ENTITIES set in ws-messages — kept as
+ * a plain string here so ddb-keys stays free of the ws-messages import; the
+ * caller validates against DeltaEntitySchema.
+ */
+export function skToEntity(sk: string): string | null {
+  if (sk.endsWith("#position")) return "position";
+  if (sk.endsWith("#interval")) return "interval";
+  if (sk.startsWith("lap#")) return "lap";
+  if (sk.startsWith("stint#")) return "stint";
+  if (sk.startsWith("weather#")) return "weather";
+  return null;
+}

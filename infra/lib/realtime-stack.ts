@@ -2,13 +2,14 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { CONN_PK_ATTR, CONN_SK_ATTR, CONN_TTL_ATTR } from "@f1/shared";
-import { RemovalPolicy, Stack, type StackProps, Tags } from "aws-cdk-lib";
+import { Duration, RemovalPolicy, Stack, type StackProps, Tags } from "aws-cdk-lib";
 import { WebSocketApi, WebSocketStage } from "aws-cdk-lib/aws-apigatewayv2";
 import { WebSocketLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { type ITableV2 } from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import { DynamoEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as logs from "aws-cdk-lib/aws-logs";
 import { type IBucket } from "aws-cdk-lib/aws-s3";
@@ -53,6 +54,7 @@ export class RealtimeStack extends Stack {
   readonly connectFn: lambda.IFunction;
   readonly disconnectFn: lambda.IFunction;
   readonly subscribeFn: lambda.IFunction;
+  readonly fanoutFn: lambda.IFunction;
 
   constructor(scope: Construct, id: string, props: RealtimeStackProps) {
     super(scope, id, props);
@@ -170,5 +172,39 @@ export class RealtimeStack extends Stack {
     this.webSocketApi.addRoute("subscribe", {
       integration: new WebSocketLambdaIntegration("SubscribeIntegration", this.subscribeFn),
     });
+
+    // ─── Fanout λ (F1Live stream → delta) ─────────────────────────────────
+    // Consumes the F1Live DDB stream and pushes per-entity deltas to every
+    // connection subscribed to that session. Closes the live path.
+    this.fanoutFn = new NodejsFunction(this, "WsFanoutFn", {
+      functionName: "F1-WS-Fanout",
+      entry: path.join(lambdaDir("ws-fanout"), "index.ts"),
+      handler: "handler",
+      ...lambdaDefaults,
+      memorySize: 512,
+      environment: {
+        CONNECTIONS_TABLE_NAME: this.connectionsTable.tableName,
+        WS_CALLBACK_URL: this.webSocketStage.callbackUrl,
+      },
+    });
+    // Stream-read perms are added by DynamoEventSource. Subscriber lookup +
+    // dead-connection cleanup on the connections table; PostToConnection.
+    this.fanoutFn.addEventSource(
+      new DynamoEventSource(this.liveTable, {
+        startingPosition: lambda.StartingPosition.LATEST,
+        batchSize: 100,
+        maxBatchingWindow: Duration.seconds(2),
+        bisectBatchOnError: true,
+        retryAttempts: 3,
+        reportBatchItemFailures: true,
+      }),
+    );
+    this.fanoutFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:Scan", "dynamodb:DeleteItem"],
+        resources: [this.connectionsTable.tableArn],
+      }),
+    );
+    this.webSocketApi.grantManageConnections(this.fanoutFn);
   }
 }

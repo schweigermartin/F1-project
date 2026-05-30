@@ -48,10 +48,15 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
   - IAM: `liveTable.grantReadData`, `dynamodb:UpdateItem` auf Connections, `grantManageConnections`. Neue Dependency `@aws-sdk/client-apigatewaymanagementapi`.
 - **Verify:** 11 Unit-Tests (Aggregation aus Fixture-Items: latest-stint/latest-lap/position/interval/weather-strip/no-driver-skip; Chunking 1-Frame vs. parted; explizite vs. resolvte Session; `no-live-session`-Fallback) + 2 Stack-Assertions (subscribe-Route, ManageConnections) → **76 infra-Tests grün**. `cdk synth` + typecheck/lint/format grün.
 
-### T5 — Fanout-Lambda (DDB-Stream → delta)
+### T5 — Fanout-Lambda (DDB-Stream → delta) — DONE
 
-- **Output:** `fanout λ` (`handler.ts` pure DI): Stream-`NEW_IMAGE` → `delta` (Entity aus SK via `@f1/shared`-Parsing), `session_id` aus PK, Subscriber-Lookup, `PostToConnection`. `410 Gone` → Connection löschen, Batch nicht failen. `DynamoEventSource` auf `F1Live`-Stream (BatchSize 100, `reportBatchItemFailures`, begrenzte Retries).
-- **Verify:** Integrationstest (pures Mocking, wie Phase-1-T12): echte `F1Live`-Stream-Record-Fixtures → korrekte deltas an die richtigen Mock-Connections, `410`-Handling, keine-Subscriber-no-op. Assertion-Test: EventSource verdrahtet.
+- **Output:**
+  - `skToEntity(sk)` in `@f1/shared/ddb-keys` — Inverse der SK-Builder (position/interval/lap/stint/weather, sonst null). 2 neue shared-Tests.
+  - `ws-fanout λ` (`handler.ts` pure DI + `index.ts`). `imageToDelta(image)` → `{session_id (aus PK), message: delta{entity (aus SK via `skToEntity`+`DeltaEntitySchema`-Validierung), data (Row ohne PK/SK/expiresAt)}}`. `fanout(event)` gruppiert deltas pro Session (ein Connection-Lookup je Session/Batch), postet an alle Subscriber. `410 Gone` → Connection löschen + nächster Subscriber, **Batch nicht failen**; echter Fehler → rethrow (Stream-Retry). REMOVE/TTL-Records übersprungen.
+  - `index.ts`: `unmarshall` der Stream-`NewImage`, `listConnections` (Scan `session_id`), `post` via `PostToConnection` (Endpoint = `webSocketStage.callbackUrl`), `deleteConnection`, `GoneException`/410-Mapping.
+  - Stack: `DynamoEventSource` auf `liveTable`-Stream (LATEST, BatchSize 100, `bisectBatchOnError`, retry 3, `reportBatchItemFailures`); IAM `dynamodb:Scan`+`DeleteItem` auf Connections, `grantManageConnections`. Neue Dep `@aws-sdk/util-dynamodb`.
+- **Verify:** 11 Handler-Tests (image→delta inkl. Attr-Stripping/weather/meta-null/Non-Session-PK; fan-out an N Connections, Lookup-once-per-Session, no-subscriber-no-op, REMOVE-skip, 410-delete-ohne-Batch-Fail, real-error-rethrow) + 2 Stack-Assertions (EventSourceMapping LATEST/100/ReportBatchItemFailures, scoped IAM) → **88 infra-Tests + 58 shared grün**. `cdk synth` + typecheck/lint/format grün.
+- **Notes:** **Live-Pfad ist damit end-to-end** (Poller → … → DDB → Stream → Browser).
 
 ### T6 — Replay-Lambda (S3-JSONL → getakteter Stream)
 

@@ -23,6 +23,7 @@
     "@aws-sdk/client-scheduler": "^3.1057.0",
     "@aws-sdk/client-sqs": "^3.1057.0",
     "@aws-sdk/lib-dynamodb": "^3.1057.0",
+    "@aws-sdk/util-dynamodb": "3.996.2",
     "@types/aws-lambda": "^8.10.161",
     "@types/node": "^22.19.19",
     "@types/uuid": "^11.0.0",

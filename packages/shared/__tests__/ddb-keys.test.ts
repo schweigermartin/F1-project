@@ -7,6 +7,7 @@ import {
   LIVE_TTL_SECONDS,
   metaSK,
   sessionPK,
+  skToEntity,
   stintSK,
   ttlEpochSeconds,
   weatherSK,
@@ -42,6 +43,21 @@ describe("Single-Table key helpers", () => {
 
   it("weather SK is a single fixed key (overwrite-on-tick)", () => {
     expect(weatherSK()).toBe("weather#current");
+  });
+});
+
+describe("skToEntity (inverse of the SK builders)", () => {
+  it("maps every entity SK back to its kind", () => {
+    expect(skToEntity(driverPositionSK(44))).toBe("position");
+    expect(skToEntity(driverIntervalSK(44))).toBe("interval");
+    expect(skToEntity(lapSK(44, 42))).toBe("lap");
+    expect(skToEntity(stintSK(44, 3))).toBe("stint");
+    expect(skToEntity(weatherSK())).toBe("weather");
+  });
+
+  it("returns null for meta and unknown SKs (not pushable as a delta)", () => {
+    expect(skToEntity(metaSK())).toBeNull();
+    expect(skToEntity("whatever#1")).toBeNull();
   });
 });
 

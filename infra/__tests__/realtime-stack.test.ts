@@ -139,3 +139,28 @@ describe("RealtimeStack — WebSocket API", () => {
     });
   });
 });
+
+describe("RealtimeStack — fanout", () => {
+  it("subscribes the fanout λ to the F1Live stream (LATEST)", () => {
+    const t = synth();
+    t.resourceCountIs("AWS::Lambda::EventSourceMapping", 1);
+    t.hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+      StartingPosition: "LATEST",
+      BatchSize: 100,
+      FunctionResponseTypes: ["ReportBatchItemFailures"],
+    });
+  });
+
+  it("grants fanout connection-scan + dead-row cleanup", () => {
+    synth().hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: ["dynamodb:Scan", "dynamodb:DeleteItem"],
+            Effect: "Allow",
+          }),
+        ]),
+      }),
+    });
+  });
+});

@@ -13,10 +13,13 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 
 ## Aufgaben
 
-### T1 — WebSocket-Message-Schemas in `@f1/shared`
+### T1 — WebSocket-Message-Schemas in `@f1/shared` — DONE
 
-- **Output:** `packages/shared/src/ws-messages.ts` — Zod-Schemas `ClientMessageSchema` (`subscribe`, `replay:start`, `replay:stop`) und `ServerMessageSchema` (`snapshot`, `delta`, `replay:end`, `info`, `error`) + `DriverState`-Typ, abgeleitet aus den Phase-1-OpenF1-Schemas. Re-Export aus `src/index.ts`. `connections-keys.ts` mit `connPK`, TTL-Helper.
-- **Verify:** Vitest — happy + invalid je Variante, Discriminated-Union greift. `pnpm -F @f1/shared test` grün, `pnpm typecheck` grün.
+- **Output:**
+  - `packages/shared/src/ws-messages.ts` — `ClientMessageSchema` (discriminated union über `action`: `subscribe`, `replay:start`, `replay:stop`) + `ServerMessageSchema` (discriminated union über `type`: `snapshot`, `delta`, `replay:end`, `info`, `error`) + `DriverStateSchema`/`DriverState` (per-Fahrer-View-Model, alle Felder außer `driver_number` nullable wegen partieller Live-Daten), wiederverwendet `TyreCompoundSchema`/`WeatherSchema` aus T2 (Constitution III). `ReplaySpeedSchema` = 1|2|4. `delta.data` bewusst `z.unknown()` (Frontend narrowt per `entity`, wie `PipelineEventSchema.payload`).
+  - `packages/shared/src/connections-keys.ts` — `connPK` (`conn#<id>`), `connMetaSK`, 2h-TTL-Helper, eigene Attr-Konstanten (kein Mischen mit F1Live).
+  - Beide via `src/index.ts` re-exportiert.
+- **Verify:** 19 neue Vitest-Cases (happy + invalid je Variante, Discriminated-Union greift, lap-string-Gaps, null-Felder). `pnpm -F @f1/shared test` → **56 grün**, `pnpm typecheck` (alle Workspaces) grün, `pnpm format:check` grün.
 - **Notes:** Single Source of Truth (Constitution III/VI) — Infra **und** Frontend importieren von hier.
 
 ### T2 — `RealtimeStack`-Skelett + Connections-Table

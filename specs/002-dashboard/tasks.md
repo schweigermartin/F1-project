@@ -134,10 +134,14 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Auszuführen (Martin, lokal):** Runbook Schritte 1–5. `cdk synth F1-Realtime` ist grün, Stack ist deploy-bereit.
 - **Verify:** kommt mit dem Deploy (Prod-URL öffnet, Live/Replay, Reconnect, Lighthouse).
 
-### T15 — Playwright-Smoke-E2E
+### T15 — Playwright-Smoke-E2E — PREPARED (Code fertig, Ausführung nach Deploy)
 
-- **Output:** Ein E2E-Test gegen die Preview-URL: Seite öffnen → Connection hergestellt → erste Daten/Replay-Frame sichtbar (Constitution X). In CI als optionaler Job (preview-getriggert).
-- **Verify:** Test grün gegen Preview-Deploy.
+- **Vorbereitet (committet):**
+  - `@playwright/test` Dev-Dep, `playwright.config.ts` (testDir `e2e/`, default startet lokal `next dev` im Demo-Modus → deterministisch ohne Backend; `BASE_URL=<preview>` überspringt den Server für Preview-Runs), `test:e2e`-Script.
+  - `e2e/race.spec.ts` — 2 Smoke-Tests: (1) Seite lädt, Heading + Connection-Badge + Timing-Tower-Header + visx-GapChart sichtbar (Constitution X „erste Daten sichtbar"), (2) Replay-Controls da, Speed 4× wählbar (`aria-pressed`).
+  - `vitest.config.ts` schließt `e2e/**` aus dem Unit-Run aus (Playwright ≠ vitest); `.gitignore` für `playwright-report/`/`test-results/`.
+- **Auszuführen (Martin):** `npx playwright install chromium` einmalig, dann lokal `pnpm -F @f1/dashboard test:e2e` (Demo-Modus) bzw. `BASE_URL=<preview> …` gegen den Deploy.
+- **Verify:** kommt mit dem Deploy/lokalen Run. Unit-Suite unverändert grün (21), e2e sauber getrennt.
 
 ### T16 — Demo-Check / Phase-2-Abschluss
 

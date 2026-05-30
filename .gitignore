@@ -30,4 +30,9 @@ venv/
 coverage/
 *.log
 
+# Playwright
+playwright-report/
+test-results/
+.playwright/
+
 *.tsbuildinfo

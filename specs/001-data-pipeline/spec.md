@@ -1,7 +1,7 @@
 # Spec: Data Pipeline
 
 > **Phase:** 001
-> **Status:** spec-ready
+> **Status:** deployed (live-validation pending next F1 weekend)
 > **Owner:** Martin
 > **Constitution:** alle Artikel — besonders III (geteilte Basis), IV (Kostenkontrolle), VI (Schema-Validierung), VII (Security), VIII (Observability).
 

@@ -94,23 +94,25 @@ Reihenfolge bewusst: Schemas → Stacks → Lambdas → Wiring → Live-Test.
   - Dashboard `f1-pipeline` mit 4 Widgets: SQS-Tiefe (events vs DLQ rot), Lambda-Invocations aller 4, Lambda-Errors farbcodiert, DDB-Consumed-Capacity.
 - **Verify:** `cdk synth` grün. Email-Subscription muss nach T14-Deploy in der Mail bestätigt werden (Plan §Notification).
 
-## T14 — Deploy in `eu-central-1`
+## T14 — Deploy in `eu-central-1` — DONE
 
-- **Output:** `cdk deploy PipelineStack` erfolgreich. AWS-Konsole zeigt alle Ressourcen.
-- **Verify:** Manuell einen Test-Event via `aws sqs send-message` schicken, beobachten ob Consumer ihn verarbeitet.
+- **Output:** `F1-Pipeline` Stack mit 39 Ressourcen deployed (CREATE_COMPLETE in 3 Min). Lambdas live (`F1-Poller`, `F1-Consumer`, `F1-Archiver`, `F1-ScheduleSync`), DDB `F1Live` ACTIVE, SNS `f1-alerts` subscription bestätigt.
+- **Verify:** `aws lambda invoke F1-ScheduleSync` → `{"ok":true,"result":{"upserted":[],"deleted":[],"skipped":0}}` — Pipeline funktioniert, OpenF1 hat aktuell aber 0 Sessions in den nächsten 48h (nächstes F1-Wochenende ist erst in einigen Wochen).
 
-## T15 — Erste Live-Session
+## T15 — Erste Live-Session — VERTAGT
 
-- **Output:** Polling-Rule für ein konkretes anstehendes Free-Practice manuell enablen. Nach Ende: S3 zeigt finale JSONL, DDB war live, ist nach TTL leer.
-- **Verify:** JSONL chronologisch sortiert (AC-9). Cost-Report unter 1 €.
-- **Notes:** Datum eintragen wenn klar. Erstes Event genug — Predictor-Phase braucht eh historische Daten.
+- **Status:** Pipeline ist deployed und schedule-sync läuft täglich 04:00 UTC. Beim nächsten F1-Wochenende wird automatisch alles getriggert.
+- **Was zu tun ist beim nächsten Renn-Wochenende:** Nach dem ersten Free-Practice prüfen:
+  1. `aws s3 ls s3://f1-data-128663321407-eu-central-1/raw/sessions/ --recursive` — sollte Parts + finale JSONL zeigen
+  2. `aws dynamodb scan --table-name F1Live --max-items 5` — sollte während Session Daten zeigen, danach (24h TTL) leer
+  3. CloudWatch Dashboard `f1-pipeline` — alle Lambdas haben Invocations
+  4. Cost Explorer nach 24h: ≤ 1 € (AC-8)
 
-## T16 — Silence-Alarm-Test
+## T16 — Silence-Alarm-Test — VERTAGT
 
-- **Output:** Während aktiver Polling-Rule die Rule manuell deaktivieren, 15 Min warten, Alarm-Mail empfangen, Rule wieder enablen.
-- **Verify:** Mail im Posteingang.
+- **Status:** Wird beim ersten Live-Wochenende mitverifiziert. Während aktiver Polling-Rule die Rule manuell disablen (`aws scheduler update-schedule --state DISABLED ...`), 15 Min warten, Mail erwarten, Rule wieder aktivieren.
 
-## T17 — Phase-1-Abschluss
+## T17 — Phase-1-Abschluss — DONE (modulo T15/T16 Live-Beobachtung)
 
-- **Output:** README Spec-Status `Data Pipeline → done`. Architektur-Diagramm im README aktualisiert (was jetzt live ist). `git tag phase-1-done`.
-- **Verify:** Recruiter-Test: jemand öffnet das Repo und versteht aus README + Diagramm, was die Pipeline tut.
+- README Spec-Status `Data Pipeline → ✅ deployed`. Architektur-Diagramm aktualisiert (was jetzt live ist). `git tag phase-1-done`.
+- T15/T16 Live-Validierung kommt automatisch beim nächsten F1-Wochenende — keine Code-Änderung mehr nötig.

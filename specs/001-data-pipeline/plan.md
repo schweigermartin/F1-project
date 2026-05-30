@@ -1,7 +1,7 @@
 # Plan: Data Pipeline
 
 > **Spec:** [spec.md](./spec.md)
-> **Status:** approved
+> **Status:** deployed (live-validation pending next F1 weekend)
 
 ## Architektur
 

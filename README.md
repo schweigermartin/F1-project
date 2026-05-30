@@ -14,27 +14,28 @@ Zwei zusammenhängende Systeme, die eine gemeinsame Datenpipeline teilen:
 
 ```
                          ┌──────────────┐
-                         │  OpenF1 API  │ 📋 (Phase 1)
+                         │  OpenF1 API  │ ✅ (Phase 1, live)
                          └──────┬───────┘
                                 │ poll (5s, nur während Sessions)
                                 ▼
                        ┌─────────────────┐
-                       │  Poller Lambda  │ 📋
+                       │  Poller Lambda  │ ✅ F1-Poller
                        └────────┬────────┘
                                 │
                                 ▼
                        ┌──────────────────┐
-                       │  SQS + DLQ       │ 📋
+                       │  SQS + DLQ       │ ✅ F1-Events / F1-Events-DLQ
                        └────────┬─────────┘
                                 │
                                 ▼
                        ┌──────────────────┐         ┌────────────────────┐
                        │ Consumer Lambda  │────────▶│ S3 (raw archive)   │ ✅ Bucket live
-                       └────────┬─────────┘         │ models/<semver>/   │     in eu-central-1
+                       │ F1-Consumer      │ ✅      │ raw/sessions/...   │     in eu-central-1
+                       └────────┬─────────┘         │ models/<semver>/   │
                                 │                   └─────────┬──────────┘
-                                ▼                             │
-                       ┌──────────────────┐                   │
-                       │  DynamoDB        │ 📋 (Phase 1)      │
+                                ▼                             │ Archiver λ ✅
+                       ┌──────────────────┐                   │ (15min cron)
+                       │  DynamoDB        │ ✅ F1Live         │
                        │  (TTL 24h)       │                   │
                        │  + Streams       │                   │
                        └───┬─────────┬────┘                   │
@@ -70,11 +71,16 @@ Zwei zusammenhängende Systeme, die eine gemeinsame Datenpipeline teilen:
                                                         │ Erklärungen  │
                                                         └──────────────┘
 
+Scheduler (täglich 04:00 UTC):
+- F1-ScheduleSync λ ✅ pollt OpenF1 /sessions, programmiert für jede kommende
+  Session ein aws-scheduler Schedule mit Window [start-15min, end+30min]
+
 Querschnitt (alle Phasen):
-- IaC: AWS CDK v2 (TypeScript)              ✅ Skelett + S3-Stack deployed
-- Geteilte Typen: packages/shared (Zod)     ✅ S3-Pfade, später OpenF1-Schemas
-- CI: GitHub Actions (lint+typecheck+synth) ✅ grün auf main
+- IaC: AWS CDK v2 (TypeScript)              ✅ 2 Stacks (DataLayer + Pipeline)
+- Geteilte Typen: packages/shared (Zod)     ✅ S3-Pfade + 6 OpenF1-Schemas + DDB-Keys
+- CI: GitHub Actions (lint+typecheck+test)  ✅ grün auf main
 - Cost-Guards: AWS Budget 5 USD/Monat       ✅ aktiv (50%/100% Alarme)
+- Observability: CloudWatch Dashboard       ✅ f1-pipeline + 4 Alarme via SNS
 ```
 
 ## Spec-Driven Development
@@ -94,14 +100,14 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 
 ## Phasen
 
-| #   | Phase                                                      | Status     | Ergebnis                                                          |
-| --- | ---------------------------------------------------------- | ---------- | ----------------------------------------------------------------- |
-| 0   | [Foundation](specs/000-foundation/spec.md)                 | ✅ done    | Monorepo + AWS-Setup + CDK + S3-Layout (deployed in eu-central-1) |
-| 1   | [Data Pipeline](specs/001-data-pipeline/spec.md)           | spec-ready | OpenF1 → SQS → Lambda → DynamoDB + S3                             |
-| 2   | [Live Dashboard](specs/002-dashboard/spec.md)              | stub       | WebSocket-API + React-Frontend auf Vercel                         |
-| 3   | [ML Model](specs/003-ml-model/spec.md)                     | stub       | XGBoost-Podium-Classifier + SHAP + S3-Artefakt                    |
-| 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md) | stub       | Inference-Lambda + Bedrock-Erklärung + Predictor-Frontend         |
-| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)           | stub       | Hit-Rate-Tracking + optional Re-Training                          |
+| #   | Phase                                                      | Status      | Ergebnis                                                          |
+| --- | ---------------------------------------------------------- | ----------- | ----------------------------------------------------------------- |
+| 0   | [Foundation](specs/000-foundation/spec.md)                 | ✅ done      | Monorepo + AWS-Setup + CDK + S3-Layout (deployed in eu-central-1) |
+| 1   | [Data Pipeline](specs/001-data-pipeline/spec.md)           | ✅ deployed  | OpenF1 → SQS → Lambda → DynamoDB + S3 (live since 2026-05-30)     |
+| 2   | [Live Dashboard](specs/002-dashboard/spec.md)              | stub        | WebSocket-API + React-Frontend auf Vercel                         |
+| 3   | [ML Model](specs/003-ml-model/spec.md)                     | stub        | XGBoost-Podium-Classifier + SHAP + S3-Artefakt                    |
+| 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md) | stub        | Inference-Lambda + Bedrock-Erklärung + Predictor-Frontend         |
+| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)           | stub        | Hit-Rate-Tracking + optional Re-Training                          |
 
 ## Stack
 
@@ -141,19 +147,29 @@ AWS_PROFILE=<dein-profil> aws sts get-caller-identity
 # 4. Lokale Validierung — alle drei sollten grün sein
 pnpm lint
 pnpm typecheck
+pnpm test
 AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk synth
 
 # 5. CDK Bootstrap (einmalig pro Account/Region)
 AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk bootstrap aws://<account>/<region>
 
 # 6. Deploy
-AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk deploy F1-DataLayer
+AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk deploy F1-DataLayer F1-Pipeline
 ```
 
-Nach Schritt 6 existiert der S3-Bucket `f1-data-<account>-<region>` in deinem AWS-Account.
+Nach Schritt 6 existieren in deinem Account:
+- S3-Bucket `f1-data-<account>-<region>`
+- DDB Table `F1Live` mit Streams
+- SQS `F1-Events` + DLQ
+- 4 Lambdas (Poller, Consumer, Archiver, Schedule-Sync)
+- CloudWatch Dashboard `f1-pipeline`, 4 Alarme, SNS-Topic `f1-alerts`
 
 ### Konsolen-Links (für Martins Account `128663321407`)
 
 - [CloudFormation-Stacks (eu-central-1)](https://eu-central-1.console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks?filteringStatus=active)
 - [S3-Bucket](https://eu-central-1.console.aws.amazon.com/s3/buckets/f1-data-128663321407-eu-central-1)
+- [DynamoDB `F1Live`](https://eu-central-1.console.aws.amazon.com/dynamodbv2/home?region=eu-central-1#table?name=F1Live)
+- [SQS `F1-Events`](https://eu-central-1.console.aws.amazon.com/sqs/v3/home?region=eu-central-1#/queues)
+- [Lambdas](https://eu-central-1.console.aws.amazon.com/lambda/home?region=eu-central-1#/functions?fo=and&o0=%3A&v0=F1-)
+- [CloudWatch Dashboard `f1-pipeline`](https://eu-central-1.console.aws.amazon.com/cloudwatch/home?region=eu-central-1#dashboards/dashboard/f1-pipeline)
 - [Budgets](https://us-east-1.console.aws.amazon.com/billing/home#/budgets)

@@ -29,10 +29,10 @@ Reihenfolge bewusst: Setup → Layout/Schema → Target/Split → Feature-Pipeli
   - `f1pred/schema.py` — `FEATURE_NAMES` (6 pre-race-Features, feste Reihenfolge) + `PodiumFeatures` (pydantic, `extra="forbid"`, Ranges auf grid_position/quali_gap).
 - **Verify:** 6 Tests (Pfade == shared-Layout; FEATURE_NAMES == Model-Felder in Reihenfolge; valid akzeptiert; out-of-range grid / negativer Gap / unknown+missing abgelehnt) → ruff + mypy + pytest (8) grün.
 
-### T3 — Target (`target.py`)
+### T3 — Target (`target.py`) — DONE
 
-- **Output:** `podium_label(results_df)` → 0/1 (`finishing_position <= 3`; DNF/NC → 0). Pure.
-- **Verify:** Test: ≤3 → 1, 4+/DNF → 0, deterministisch.
+- **Output:** `podium_label(results, position_col="position")` → 0/1-Series, `pd.to_numeric(errors="coerce")` → DNF/NC/NaN → 0. Pure.
+- **Verify:** 4 Tests (Top-3→1; Non-Finisher→0; non-numeric coerced; deterministisch) → ruff + mypy + pytest (12) grün.
 
 ### T4 — Temporal Split (`split.py`)
 

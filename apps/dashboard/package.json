@@ -7,6 +7,6 @@
     "build": "echo \"dashboard build placeholder — implemented in Phase 2\"",
     "lint": "echo \"dashboard lint placeholder\"",
     "test": "echo \"dashboard test placeholder\"",
-    "typecheck": "echo \"dashboard typecheck placeholder\""
+    "typecheck": "tsc --noEmit"
   }
 }

@@ -7,6 +7,6 @@
     "build": "echo \"predictor build placeholder — implemented in Phase 4\"",
     "lint": "echo \"predictor lint placeholder\"",
     "test": "echo \"predictor test placeholder\"",
-    "typecheck": "echo \"predictor typecheck placeholder\""
+    "typecheck": "tsc --noEmit"
   }
 }

@@ -2,6 +2,7 @@
   "name": "@f1/shared",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "Shared types, Zod schemas, and S3 path helpers — single source of truth across apps and infra.",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
@@ -9,6 +10,6 @@
     "build": "echo \"shared build placeholder — TS build added in T2\"",
     "lint": "echo \"shared lint placeholder\"",
     "test": "echo \"shared test placeholder — Vitest added in Phase 1 T2\"",
-    "typecheck": "echo \"shared typecheck placeholder\""
+    "typecheck": "tsc --noEmit"
   }
 }

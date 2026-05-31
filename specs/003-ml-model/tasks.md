@@ -60,10 +60,10 @@ Reihenfolge bewusst: Setup → Layout/Schema → Target/Split → Feature-Pipeli
 - **Output:** `evaluate(model, x_test, y_test)` → `Metrics` (TypedDict: accuracy, log_loss, roc_auc, confusion_matrix); `baseline_grid_top3(...)` mit denselben Metriken (AC-5, Vergleich Modell vs. „Podium = Grid ≤ 3"). `confusion_figure`/`calibration_figure` über die OO-Matplotlib-API (kein pyplot/Display). AUC→NaN bei nur einer Klasse.
 - **Verify:** 3 Tests (alle Metriken in Range; Baseline finite; beide Figures bauen ohne Display) auf trainiertem Synthetik-Modell. ruff + mypy (9) + pytest (32) grün.
 
-### T9 — SHAP (`explain.py`)
+### T9 — SHAP (`explain.py`) — DONE
 
-- **Output:** `shap_global(model, X)` + `shap_one(model, row)` (TreeExplainer) → Figures. (AC-6)
-- **Verify:** Test: läuft auf dem synthetischen Modell ohne Fehler, liefert erwartete Shapes.
+- **Output:** `global_importance(model, x)` (mean|SHAP| je Feature, absteigend) + `one_prediction_shap(model, row)` (signierte Beiträge) via `shap.TreeExplainer`; `importance_figure`/`one_prediction_figure` als robuste Matplotlib-OO-Barplots (kein shap-Plotting/Display). Positive Klasse aus 3D-SHAP extrahiert. (AC-6)
+- **Verify:** 3 Tests (Importance deckt alle Features ab + ≥0; per-Prediction ein Wert je Feature; beide Figures bauen) → ruff + mypy (10) + pytest (45) grün.
 
 ### T10 — Artefakt + Model-Card (`artifact.py`)
 

@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SCHEDULE_NAME_PREFIX, type ScheduleSyncDeps, syncSchedules } from "../handler.js";
+import {
+  INFERENCE_SCHEDULE_PREFIX,
+  SCHEDULE_NAME_PREFIX,
+  type ScheduleSyncDeps,
+  syncSchedules,
+} from "../handler.js";
 
 const NOW = new Date("2026-05-23T12:00:00.000Z"); // day before Montréal race
 
@@ -9,11 +14,12 @@ function makeSession(opts: {
   start: string;
   end: string;
   cancelled?: boolean;
+  name?: string;
 }): Record<string, unknown> {
   return {
     session_key: opts.key,
     session_type: "Race",
-    session_name: "Race",
+    session_name: opts.name ?? "Race",
     date_start: opts.start,
     date_end: opts.end,
     meeting_key: 1285,
@@ -36,15 +42,25 @@ function makeMocks(opts: { sessions: unknown; existing?: string[] }): {
   const fetchSessions = vi.fn(async () => opts.sessions);
   const listExistingSchedules = vi.fn(async () => opts.existing ?? []);
   const upsertSchedule = vi.fn(async () => {});
+  const upsertInferenceSchedule = vi.fn(async () => {});
   const deleteSchedule = vi.fn(async () => {});
   const emitMetric = vi.fn();
   return {
-    mocks: { fetchSessions, listExistingSchedules, upsertSchedule, deleteSchedule, emitMetric },
+    mocks: {
+      fetchSessions,
+      listExistingSchedules,
+      upsertSchedule,
+      upsertInferenceSchedule,
+      deleteSchedule,
+      emitMetric,
+    },
     deps: {
       fetchSessions,
       listExistingSchedules,
       upsertSchedule,
+      upsertInferenceSchedule,
       deleteSchedule,
+      modelVersion: "0.1.0",
       now: () => NOW,
       emitMetric,
     },
@@ -150,6 +166,105 @@ describe("syncSchedules — cleanup", () => {
     ]);
     const result = await syncSchedules({ ...m.deps, now: () => now });
     expect(result.deleted).toHaveLength(0);
+  });
+});
+
+describe("syncSchedules — inference schedules (Phase 4)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("creates a one-shot T-60min inference schedule per upcoming race", async () => {
+    const m = makeMocks({
+      sessions: [
+        makeSession({
+          key: 11291,
+          start: "2026-05-24T20:00:00+00:00",
+          end: "2026-05-24T22:00:00+00:00",
+        }),
+      ],
+    });
+    const result = await syncSchedules(m.deps);
+
+    expect(result.inferenceUpserted).toHaveLength(1);
+    const spec = result.inferenceUpserted[0]!;
+    expect(spec.name).toBe(`${INFERENCE_SCHEDULE_PREFIX}11291`);
+    expect(spec.race_date).toBe("2026-05-24");
+    expect(spec.round).toBe(1);
+    expect(spec.model_version).toBe("0.1.0");
+    expect(spec.runAt.toISOString()).toBe("2026-05-24T19:00:00.000Z");
+    expect(m.mocks["upsertInferenceSchedule"]).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not schedule inference for a non-race session (only the poller runs)", async () => {
+    const m = makeMocks({
+      sessions: [
+        makeSession({
+          key: 11288,
+          start: "2026-05-24T18:00:00+00:00",
+          end: "2026-05-24T19:00:00+00:00",
+          name: "Qualifying",
+        }),
+      ],
+    });
+    const result = await syncSchedules(m.deps);
+
+    expect(result.upserted).toHaveLength(1); // poller still scheduled
+    expect(result.inferenceUpserted).toHaveLength(0);
+    expect(m.mocks["upsertInferenceSchedule"]).not.toHaveBeenCalled();
+  });
+
+  it("skips inference when the T-60min window has already passed", async () => {
+    const m = makeMocks({
+      sessions: [
+        // Race starts 30min from NOW → runAt (T-60) is in the past.
+        makeSession({
+          key: 11291,
+          start: "2026-05-23T12:30:00+00:00",
+          end: "2026-05-23T14:30:00+00:00",
+        }),
+      ],
+    });
+    const result = await syncSchedules(m.deps);
+
+    expect(result.upserted).toHaveLength(1);
+    expect(result.inferenceUpserted).toHaveLength(0);
+  });
+
+  it("round reflects the race's position in the season", async () => {
+    const m = makeMocks({
+      sessions: [
+        makeSession({
+          key: 11200,
+          start: "2026-03-15T15:00:00+00:00",
+          end: "2026-03-15T17:00:00+00:00",
+        }), // past round 1
+        makeSession({
+          key: 11291,
+          start: "2026-05-24T20:00:00+00:00",
+          end: "2026-05-24T22:00:00+00:00",
+        }), // upcoming round 2
+      ],
+    });
+    const result = await syncSchedules(m.deps);
+
+    expect(result.inferenceUpserted).toHaveLength(1);
+    expect(result.inferenceUpserted[0]!.round).toBe(2);
+  });
+
+  it("sweeps a stale inference schedule that no longer maps to a race", async () => {
+    const m = makeMocks({
+      sessions: [
+        makeSession({
+          key: 11291,
+          start: "2026-05-24T20:00:00+00:00",
+          end: "2026-05-24T22:00:00+00:00",
+        }),
+      ],
+      existing: [`${INFERENCE_SCHEDULE_PREFIX}11291`, `${INFERENCE_SCHEDULE_PREFIX}99999`],
+    });
+    const result = await syncSchedules(m.deps);
+
+    expect(result.inferenceDeleted).toEqual([`${INFERENCE_SCHEDULE_PREFIX}99999`]);
+    expect(m.mocks["deleteSchedule"]).toHaveBeenCalledWith(`${INFERENCE_SCHEDULE_PREFIX}99999`);
   });
 });
 

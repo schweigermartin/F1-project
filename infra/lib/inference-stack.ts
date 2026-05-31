@@ -22,7 +22,10 @@ const repoRoot = path.resolve(__dirname, "..", "..");
 const BEDROCK_MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0";
 const CLAUDE_HAIKU_FM_PATTERN = "anthropic.claude-haiku-4-5-*";
 
-const INFERENCE_FN_NAME = "F1-Inference";
+/** Known names so PipelineStack's schedule-sync can build the ARNs without a
+ * cross-stack reference (which would create a Pipeline↔Inference cycle). */
+export const INFERENCE_FN_NAME = "F1-Inference";
+export const INFERENCE_SCHEDULER_ROLE_NAME = "F1-Scheduler-InvokeInference";
 
 export interface InferenceStackProps extends StackProps {
   /** Shared data bucket — the inference λ reads models/<version>/model.json. */
@@ -157,7 +160,7 @@ export class InferenceStack extends Stack {
     // schedule entries are programmed at runtime). See the README/plan for how
     // schedule-sync emits the race schedules.
     this.schedulerInvokeRole = new iam.Role(this, "SchedulerInvokeRole", {
-      roleName: "F1-Scheduler-InvokeInference",
+      roleName: INFERENCE_SCHEDULER_ROLE_NAME,
       assumedBy: new iam.ServicePrincipal("scheduler.amazonaws.com"),
       inlinePolicies: {
         InvokeInference: new iam.PolicyDocument({

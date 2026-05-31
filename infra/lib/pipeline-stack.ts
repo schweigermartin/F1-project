@@ -2,7 +2,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { PK_ATTR, SK_ATTR, TTL_ATTR } from "@f1/shared";
-import { Duration, RemovalPolicy, Stack, type StackProps, Tags } from "aws-cdk-lib";
+import { ArnFormat, Duration, RemovalPolicy, Stack, type StackProps, Tags } from "aws-cdk-lib";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as cwActions from "aws-cdk-lib/aws-cloudwatch-actions";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
@@ -19,8 +19,13 @@ import * as snsSubs from "aws-cdk-lib/aws-sns-subscriptions";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import { type Construct } from "constructs";
 
+import { INFERENCE_FN_NAME, INFERENCE_SCHEDULER_ROLE_NAME } from "./inference-stack.js";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const lambdaDir = (sub: string): string => path.resolve(__dirname, "..", "lambda", sub);
+
+/** Active published model the inference schedules point at (models/<v>/, Ph. 3). */
+const ACTIVE_MODEL_VERSION = "0.1.0";
 
 export interface PipelineStackProps extends StackProps {
   readonly dataBucket: IBucket;
@@ -178,6 +183,22 @@ export class PipelineStack extends Stack {
       environment: {
         POLLER_FUNCTION_ARN: this.pollerFn.functionArn,
         SCHEDULER_ROLE_ARN: this.schedulerInvokeRole.roleArn,
+        // Phase 4: also program one-shot inference schedules. Built from the
+        // known InferenceStack names (not cross-stack refs) to avoid a
+        // Pipeline↔Inference dependency cycle.
+        INFERENCE_FUNCTION_ARN: Stack.of(this).formatArn({
+          service: "lambda",
+          resource: "function",
+          resourceName: INFERENCE_FN_NAME,
+          arnFormat: ArnFormat.COLON_RESOURCE_NAME,
+        }),
+        INFERENCE_SCHEDULER_ROLE_ARN: Stack.of(this).formatArn({
+          service: "iam",
+          region: "",
+          resource: "role",
+          resourceName: INFERENCE_SCHEDULER_ROLE_NAME,
+        }),
+        MODEL_VERSION: ACTIVE_MODEL_VERSION,
       },
     });
     // Manage f1-poll-* schedules; pass the invoke role to scheduler.
@@ -196,7 +217,17 @@ export class PipelineStack extends Stack {
     this.scheduleSyncFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["iam:PassRole"],
-        resources: [this.schedulerInvokeRole.roleArn],
+        // The poller's scheduler role (this stack) + the inference scheduler
+        // role (InferenceStack, built from its known name to avoid a cycle).
+        resources: [
+          this.schedulerInvokeRole.roleArn,
+          Stack.of(this).formatArn({
+            service: "iam",
+            region: "",
+            resource: "role",
+            resourceName: INFERENCE_SCHEDULER_ROLE_NAME,
+          }),
+        ],
       }),
     );
     new events.Rule(this, "ScheduleSyncDailyCron", {

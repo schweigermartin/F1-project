@@ -7,15 +7,29 @@ import {
   UpdateScheduleCommand,
 } from "@aws-sdk/client-scheduler";
 
-import { SCHEDULE_NAME_PREFIX, type ScheduleSpec, syncSchedules } from "./handler.js";
+import {
+  INFERENCE_SCHEDULE_PREFIX,
+  type InferenceScheduleSpec,
+  SCHEDULE_NAME_PREFIX,
+  type ScheduleSpec,
+  syncSchedules,
+} from "./handler.js";
 
 const POLLER_FUNCTION_ARN = process.env["POLLER_FUNCTION_ARN"];
 const SCHEDULER_ROLE_ARN = process.env["SCHEDULER_ROLE_ARN"];
+// Phase 4 — built from known names in pipeline-stack (no cross-stack ref, so no
+// PipelineStack↔InferenceStack cycle). MODEL_VERSION is the active model id.
+const INFERENCE_FUNCTION_ARN = process.env["INFERENCE_FUNCTION_ARN"];
+const INFERENCE_SCHEDULER_ROLE_ARN = process.env["INFERENCE_SCHEDULER_ROLE_ARN"];
+const MODEL_VERSION = process.env["MODEL_VERSION"];
 const CURRENT_YEAR = new Date().getUTCFullYear();
 const OPENF1_BASE = "https://api.openf1.org/v1";
 
 if (!POLLER_FUNCTION_ARN) throw new Error("POLLER_FUNCTION_ARN env var not set");
 if (!SCHEDULER_ROLE_ARN) throw new Error("SCHEDULER_ROLE_ARN env var not set");
+if (!INFERENCE_FUNCTION_ARN) throw new Error("INFERENCE_FUNCTION_ARN env var not set");
+if (!INFERENCE_SCHEDULER_ROLE_ARN) throw new Error("INFERENCE_SCHEDULER_ROLE_ARN env var not set");
+if (!MODEL_VERSION) throw new Error("MODEL_VERSION env var not set");
 
 const scheduler = new SchedulerClient({});
 
@@ -48,16 +62,45 @@ async function upsertSchedule(spec: ScheduleSpec): Promise<void> {
   }
 }
 
+/** One-shot schedule firing the inference λ once at `runAt` (UTC), then self-
+ * deleting (ActionAfterCompletion DELETE) so fired schedules don't accumulate. */
+async function upsertInferenceSchedule(spec: InferenceScheduleSpec): Promise<void> {
+  const params = {
+    Name: spec.name,
+    // `at(...)` wants a local timestamp without offset; pin the timezone to UTC.
+    ScheduleExpression: `at(${spec.runAt.toISOString().slice(0, 19)})`,
+    ScheduleExpressionTimezone: "UTC",
+    FlexibleTimeWindow: { Mode: "OFF" as const },
+    ActionAfterCompletion: "DELETE" as const,
+    Target: {
+      Arn: INFERENCE_FUNCTION_ARN!,
+      RoleArn: INFERENCE_SCHEDULER_ROLE_ARN!,
+      Input: JSON.stringify({
+        race_date: spec.race_date,
+        round: spec.round,
+        model_version: spec.model_version,
+      }),
+    },
+  };
+  if (await scheduleExists(spec.name)) {
+    await scheduler.send(new UpdateScheduleCommand(params));
+  } else {
+    await scheduler.send(new CreateScheduleCommand(params));
+  }
+}
+
 async function listSchedules(): Promise<string[]> {
   const names: string[] = [];
-  let token: string | undefined;
-  do {
-    const res = await scheduler.send(
-      new ListSchedulesCommand({ NamePrefix: SCHEDULE_NAME_PREFIX, NextToken: token }),
-    );
-    token = res.NextToken;
-    for (const s of res.Schedules ?? []) if (s.Name) names.push(s.Name);
-  } while (token);
+  for (const prefix of [SCHEDULE_NAME_PREFIX, INFERENCE_SCHEDULE_PREFIX]) {
+    let token: string | undefined;
+    do {
+      const res = await scheduler.send(
+        new ListSchedulesCommand({ NamePrefix: prefix, NextToken: token }),
+      );
+      token = res.NextToken;
+      for (const s of res.Schedules ?? []) if (s.Name) names.push(s.Name);
+    } while (token);
+  }
   return names;
 }
 
@@ -74,9 +117,11 @@ export async function handler(): Promise<{ ok: boolean; result: unknown }> {
     },
     listExistingSchedules: listSchedules,
     upsertSchedule,
+    upsertInferenceSchedule,
     deleteSchedule: async (Name) => {
       await scheduler.send(new DeleteScheduleCommand({ Name }));
     },
+    modelVersion: MODEL_VERSION!,
     now: () => new Date(),
     emitMetric: (name, value, dim) => metrics.push({ name, value, dim }),
   });

@@ -22,6 +22,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest~=8.3", "mypy~=1.13", "ruff~=0.8", "moto~=5.0", "pandas-stubs~=2.2"]
+# Notebook execution tooling for the real training run (T12). Kept out of `dev`
+# so CI (lint+type+test) stays lean; install with `pip install -e ".[notebook]"`.
+notebook = ["nbconvert~=7.16", "ipykernel~=6.29"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/f1pred"]

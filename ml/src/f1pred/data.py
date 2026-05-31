@@ -13,11 +13,23 @@ Normalized race columns (one row per race×driver):
 import logging
 import math
 from collections.abc import Callable, Iterable
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+#: Local FastF1 HTTP cache (relative to CWD; the notebook runs from `ml/`).
+CACHE_DIR = ".fastf1-cache"
+
+
+def _enable_cache() -> None:
+    """Enable the FastF1 cache, creating the dir first (FastF1 won't create it)."""
+    import fastf1  # noqa: PLC0415 — lazy so the module imports without FastF1
+
+    Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
+    fastf1.Cache.enable_cache(CACHE_DIR)
 
 RACE_COLUMNS = [
     "year",
@@ -65,7 +77,7 @@ def fastf1_rounds_for_year(year: int) -> list[int]:
     """Round numbers of the conventional races in a season (lazy FastF1 import)."""
     import fastf1  # noqa: PLC0415 — lazy so the module imports without FastF1
 
-    fastf1.Cache.enable_cache(".fastf1-cache")
+    _enable_cache()
     schedule = fastf1.get_event_schedule(year, include_testing=False)
     return [int(r) for r in schedule["RoundNumber"].tolist() if int(r) >= 1]
 
@@ -73,13 +85,18 @@ def fastf1_rounds_for_year(year: int) -> list[int]:
 def fastf1_load_race(year: int, rnd: int) -> pd.DataFrame | None:
     """Load + normalize one race (Race + Qualifying + Weather). None on missing data."""
     import fastf1  # noqa: PLC0415
+    from fastf1.exceptions import RateLimitExceededError  # noqa: PLC0415
 
-    fastf1.Cache.enable_cache(".fastf1-cache")
+    _enable_cache()
     try:
         race = fastf1.get_session(year, rnd, "R")
         race.load(telemetry=False, weather=True, messages=False)
         quali = fastf1.get_session(year, rnd, "Q")
         quali.load(telemetry=False, weather=False, messages=False)
+    except RateLimitExceededError:
+        # Transient, not missing data: propagate so the caller can back off and
+        # resume from cache rather than silently dropping the round (R-4).
+        raise
     except Exception as exc:  # noqa: BLE001 — FastF1 raises broadly on missing data
         logger.warning("FastF1 load failed for %s round %s: %s", year, rnd, exc)
         return None

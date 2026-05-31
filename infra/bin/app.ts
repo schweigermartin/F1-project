@@ -29,13 +29,12 @@ new RealtimeStack(app, "F1-Realtime", {
   liveTable: pipeline.liveTable,
   dataBucket: dataLayer.dataBucket,
   alertTopic: pipeline.alertTopic,
-  // $connect origin allowlist (Constitution VII). Exact prod origin + local
-  // dev; deliberately not a `*.vercel.app` wildcard (preview deploys can't
-  // open the public socket). Add a wildcard entry here if previews need it.
-  allowedOrigins: [
-    "https://f1-project-martins-projects-bec7d357.vercel.app",
-    "http://localhost:3000",
-  ],
+  // $connect origin allowlist (Constitution VII). Exact prod alias the
+  // dashboard is served from + localhost for dev — deliberately no
+  // `*.vercel.app` wildcard (least privilege). New Vercel URLs (e.g. preview
+  // deploys) must be added here explicitly. The origin is only the cheap first
+  // filter; the real gate is the HMAC token (server-minted, WS_TOKEN_SECRET).
+  allowedOrigins: ["https://f1-project-zeta.vercel.app", "http://localhost:3000"],
 });
 
 // Constitution Artikel III: every resource gets these tags so we can audit

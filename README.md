@@ -43,15 +43,15 @@ Zwei zusammenhängende Systeme, die eine gemeinsame Datenpipeline teilen:
                            │         │ Stream                 │ training data
                            │         ▼                        ▼
                            │   ┌──────────────┐         ┌──────────────┐
-                           │   │  WebSocket   │ 🛠️      │  Training    │ 📋 (Phase 3)
-                           │   │  API Gateway │ (Ph. 2) │  (FastF1 +   │
-                           │   │  +5 λ +auth  │ Code da │   XGBoost)   │
+                           │   │  WebSocket   │ ✅      │  Training    │ 🛠️ (Phase 3)
+                           │   │  API Gateway │ (Ph. 2) │  (FastF1 +   │ Code da
+                           │   │  +5 λ +auth  │ live    │   XGBoost)   │
                            │   └──────┬───────┘         │              │
                            │          │                 └──────┬───────┘
                            │          ▼                        │
                            │   ┌──────────────┐                ▼
-                           │   │ apps/dashbd  │ 🛠️      ┌──────────────┐
-                           │   │ Next.js+visx │ Code da │ model.json   │
+                           │   │ apps/dashbd  │ ✅      ┌──────────────┐
+                           │   │ Next.js+visx │ Vercel  │ model.json   │
                            │   └──────────────┘         │ in S3        │
                            │                            └──────┬───────┘
                            │ predictions + actuals             │
@@ -77,11 +77,11 @@ Scheduler (täglich 04:00 UTC):
   Session ein aws-scheduler Schedule mit Window [start-15min, end+30min]
 
 Querschnitt (alle Phasen):
-- IaC: AWS CDK v2 (TypeScript)              ✅ 2 Stacks (DataLayer + Pipeline)
+- IaC: AWS CDK v2 (TypeScript)              ✅ 3 Stacks (DataLayer + Pipeline + Realtime)
 - Geteilte Typen: packages/shared (Zod)     ✅ S3-Pfade + 6 OpenF1-Schemas + DDB-Keys
 - CI: GitHub Actions (lint+typecheck+test)  ✅ grün auf main
 - Cost-Guards: AWS Budget 5 USD/Monat       ✅ aktiv (50%/100% Alarme)
-- Observability: CloudWatch Dashboard       ✅ f1-pipeline + 4 Alarme via SNS
+- Observability: CloudWatch Dashboards      ✅ f1-pipeline + f1-realtime, 7 Alarme via SNS
 ```
 
 ## Spec-Driven Development
@@ -101,14 +101,14 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 
 ## Phasen
 
-| #   | Phase                                                      | Status      | Ergebnis                                                               |
-| --- | ---------------------------------------------------------- | ----------- | ---------------------------------------------------------------------- |
-| 0   | [Foundation](specs/000-foundation/spec.md)                 | ✅ done     | Monorepo + AWS-Setup + CDK + S3-Layout (deployed in eu-central-1)      |
-| 1   | [Data Pipeline](specs/001-data-pipeline/spec.md)           | ✅ deployed | OpenF1 → SQS → Lambda → DynamoDB + S3 (live since 2026-05-30)          |
-| 2   | [Live Dashboard](specs/002-dashboard/spec.md)              | 🛠️ code da  | WebSocket-API (5 λ + Auth) + Next.js/visx-Frontend — Deploy ausstehend |
-| 3   | [ML Model](specs/003-ml-model/spec.md)                     | stub        | XGBoost-Podium-Classifier + SHAP + S3-Artefakt                         |
-| 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md) | stub        | Inference-Lambda + Bedrock-Erklärung + Predictor-Frontend              |
-| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)           | stub        | Hit-Rate-Tracking + optional Re-Training                               |
+| #   | Phase                                                      | Status      | Ergebnis                                                                                  |
+| --- | ---------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------- |
+| 0   | [Foundation](specs/000-foundation/spec.md)                 | ✅ done     | Monorepo + AWS-Setup + CDK + S3-Layout (deployed in eu-central-1)                         |
+| 1   | [Data Pipeline](specs/001-data-pipeline/spec.md)           | ✅ deployed | OpenF1 → SQS → Lambda → DynamoDB + S3 (live since 2026-05-30)                             |
+| 2   | [Live Dashboard](specs/002-dashboard/spec.md)              | ✅ deployed | F1-Realtime-Stack (WebSocket-API, 5 λ, HMAC-Auth) + Next.js/visx-Frontend live auf Vercel |
+| 3   | [ML Model](specs/003-ml-model/spec.md)                     | 🛠️ code da  | XGBoost-Podium-Classifier + SHAP + S3-Artefakt                                            |
+| 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md) | stub        | Inference-Lambda + Bedrock-Erklärung + Predictor-Frontend                                 |
+| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)           | stub        | Hit-Rate-Tracking + optional Re-Training                                                  |
 
 ## Stack
 
@@ -154,17 +154,25 @@ AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk synth
 # 5. CDK Bootstrap (einmalig pro Account/Region)
 AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk bootstrap aws://<account>/<region>
 
-# 6. Deploy
-AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk deploy F1-DataLayer F1-Pipeline
+# 6. Deploy (Pipeline + Realtime)
+# F1-Realtime liest ein HMAC-Secret aus SSM — einmalig out-of-band anlegen:
+SECRET=$(openssl rand -hex 32)
+AWS_PROFILE=<dein-profil> aws ssm put-parameter --name /f1/ws-token-secret \
+  --type SecureString --value "$SECRET" --region <region>
+# danach deployen (allowedOrigins in infra/bin/app.ts auf deine Vercel-Domain setzen):
+AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk deploy F1-DataLayer F1-Pipeline F1-Realtime
 ```
 
 Nach Schritt 6 existieren in deinem Account:
 
 - S3-Bucket `f1-data-<account>-<region>`
-- DDB Table `F1Live` mit Streams
+- DDB Tables `F1Live` (Streams) + `F1Connections` (TTL 2h)
 - SQS `F1-Events` + DLQ
-- 4 Lambdas (Poller, Consumer, Archiver, Schedule-Sync)
-- CloudWatch Dashboard `f1-pipeline`, 4 Alarme, SNS-Topic `f1-alerts`
+- API Gateway WebSocket `F1-Realtime` (Stage `live`)
+- 10 Lambdas (4 Pipeline: Poller/Consumer/Archiver/Schedule-Sync + 6 WS: Connect/Disconnect/Authorizer/Subscribe/Fanout/Replay)
+- CloudWatch Dashboards `f1-pipeline` + `f1-realtime`, 7 Alarme, SNS-Topic `f1-alerts`
+
+Das Frontend (`apps/dashboard`) wird separat auf Vercel deployed (Root Directory `apps/dashboard`, Env-Vars `NEXT_PUBLIC_WS_URL` = WebSocketUrl-Output + `WS_TOKEN_SECRET` = dasselbe SSM-Secret).
 
 ### Konsolen-Links (für Martins Account `128663321407`)
 

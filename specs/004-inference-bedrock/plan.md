@@ -184,5 +184,12 @@ nur einmal pro `(race, model_version)`.
   (Feedback-Loop) sie mit den Ist-Ergebnissen vergleichen muss — sie dürfen nicht
   nach 24 h verschwinden. Keys kommen weiterhin aus `@f1/shared/ddb-keys`.
 - **Erster Python-/Docker-Lambda** (bisher nur NodejsFunction): nötig wegen
-  xgboost/shap; das Muster (`handler.py` pur + DI, `index`/`lambda_handler` als
-  Adapter) bleibt analog zu Phase 1/2.
+  xgboost/shap; das Muster (pure Handler + DI, `lambda_function`/`lambda_handler`
+  als Adapter) bleibt analog zu Phase 1/2.
+- **Pure Handler im `f1pred`-Paket statt unter `infra/lambda/inference/`** (Plan §1):
+  Die CI testet Python nur unter `ml/` (`pytest ml/`, `ruff check ml/`, `mypy ml/src`) —
+  ein Handler unter `infra/` würde nicht in CI laufen und die Verify-Anforderung
+  („pytest treibt den Handler") verfehlen. `handle_inference` + der Bedrock-Prompt-
+  Mirror (`f1pred/bedrock_prompt.py`, byte-genau zu `@f1/shared/bedrock-prompts.ts`)
+  liegen daher in `f1pred` (das per Dockerfile ohnehin ins Image installiert wird);
+  der dünne boto3/FastF1-Adapter unter `infra/lambda/inference/` (T7) importiert ihn.

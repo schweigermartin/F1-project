@@ -64,8 +64,15 @@ probability, shapTop)` → strukturierter User-Prompt, max. 3 Sätze gefordert (
 - **Verify:** `pytest` gegen injizierte Fake-Loader (kein FastF1/Netz); deckt
   „Fahrer ohne Quali" + leeres Feld ab.
 
-### T6 — Inference-Lambda-Handler (`infra/lambda/inference/handler.py`)
+### T6 — Inference-Lambda-Handler (`ml/src/f1pred/inference_handler.py`)
 
+- **Pfad-Abweichung:** Der pure Handler liegt im `f1pred`-Paket, **nicht** unter
+  `infra/lambda/inference/` (Plan §1). Grund: die CI testet Python nur unter `ml/`
+  (`pytest ml/`); ein Handler unter `infra/` liefe nicht in CI und verfehlte die
+  Verify-Anforderung. `f1pred` wird per Dockerfile (T7) ohnehin ins Lambda-Image
+  installiert; der dünne Adapter (T7) importiert `handle_inference` von hier.
+  Der Bedrock-Prompt wird als Python-Mirror (`f1pred/bedrock_prompt.py`) von
+  `@f1/shared/bedrock-prompts.ts` geführt (Parity-Test byte-genau).
 - **Output:** pure `handle_inference(event, deps)` (DI: `load_model`, `load_features`,
   `put_prediction`, `invoke_bedrock`, `get_cached_explanation`, `now`, `emit_metric`,
   `logger`). Flow: Features → predict → `prediction#<N>` schreiben → falls keine

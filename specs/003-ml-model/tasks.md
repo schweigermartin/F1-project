@@ -45,10 +45,10 @@ Reihenfolge bewusst: Setup → Layout/Schema → Target/Split → Feature-Pipeli
 - **Verify:** 7 Tests (Constitution X): Feature-Spalten vorhanden; Determinismus (`assert_frame_equal`); Erstrennen verworfen; `driver_form` nutzt nur Vergangenheit (Wert geprüft); **Anti-Leakage** (Permutation der letzten-Runde-Ergebnisse → Features der Runde unverändert); fehlendes Pflichtfeld → Zeile weg. Synthetische Fixtures, **kein FastF1**. → ruff + mypy (6) + pytest (22) grün.
 - **Notes:** track_history-Neutral-Fill ist eine bewusste Verfeinerung ggü. „Default verwerfen" (Plan §Feature-Pipeline aktualisiert).
 
-### T6 — Data Layer (`data.py`)
+### T6 — Data Layer (`data.py`) — DONE
 
-- **Output:** `load_seasons(years)` — FastF1 Race+Quali+Weather → normalisierte Frames, Cache `.fastf1-cache/`. Fehlende Session → skip + log (R-4).
-- **Verify:** Dünn + DI-fähig (Session-Loader injizierbar); Test gegen einen gemockten/aufgezeichneten Mini-Frame, kein echter Download in CI.
+- **Output:** `load_seasons(years, *, rounds_for_year, load_race)` — konkatiniert normalisierte Race-Frames (`RACE_COLUMNS`), fehlende Runde → skip + log (R-4). Default-Loader `fastf1_load_race`/`fastf1_rounds_for_year` mit **lazy** FastF1-Import + Cache `.fastf1-cache/` (Quali-Gap-zu-Pole, Regen-Flag, Coercion-Helfer). FastF1-Pfad nur im echten Lauf (T12) ausgeführt.
+- **Verify:** 3 Tests (Konkatenation, skip-bei-None, leerer Frame mit korrekten Spalten) gegen injizierte Fake-Loader — **kein FastF1/Netzwerk**. ruff + mypy (7) + pytest (25) grün.
 
 ### T7 — Training (`train.py`)
 

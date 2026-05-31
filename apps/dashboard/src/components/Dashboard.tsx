@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { type ReactNode, useEffect, useMemo } from "react";
 
 import { useRaceSocket } from "../hooks/use-race-socket";
@@ -50,7 +51,15 @@ export function Dashboard(): ReactNode {
           marginBottom: "1rem",
         }}
       >
-        <h1 style={{ color: "var(--accent)", margin: 0 }}>F1 Live Dashboard</h1>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "1rem" }}>
+          <h1 style={{ color: "var(--accent)", margin: 0 }}>F1 Live Dashboard</h1>
+          <Link
+            href="/architecture"
+            style={{ color: "var(--muted)", textDecoration: "none", fontSize: "0.85rem" }}
+          >
+            Architektur →
+          </Link>
+        </div>
         <ConnectionStatus status={connection} mode={mode} />
       </header>
 

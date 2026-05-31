@@ -1,7 +1,7 @@
 # Plan: ML Model
 
 > **Spec:** [spec.md](./spec.md)
-> **Status:** draft
+> **Status:** done — implementiert (T1–T13), Modell 0.1.0 in S3, Notebook mit Outputs
 
 ## Architektur
 

@@ -16,7 +16,7 @@ from f1pred.layout import model_artifact_key, model_card_key
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_LOCAL_DIR = "ml/artifacts"
+DEFAULT_LOCAL_DIR = "artifacts"  # relative to the ml/ workdir (gitignored as ml/artifacts/)
 
 
 @dataclass(frozen=True)

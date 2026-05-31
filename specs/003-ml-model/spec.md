@@ -1,7 +1,7 @@
 # Spec: ML Model
 
 > **Phase:** 003
-> **Status:** spec-ready
+> **Status:** done — Modell 0.1.0 trainiert (Test 2025: ROC-AUC 0.93, Log-Loss 0.28) + nach S3 publisht, Notebook mit Outputs
 > **Owner:** Martin
 > **Constitution:** alle Artikel — besonders IX (versionierte Artefakte, reproduzierbare Läufe), VI (Typsicherheit + Validierung), X (Tests für die Feature-Pipeline), IV (Kosten).
 

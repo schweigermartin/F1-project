@@ -1,7 +1,7 @@
 # Tasks: ML Model
 
 > **Plan:** [plan.md](./plan.md)
-> **Status:** ready
+> **Status:** done — T1–T13 erledigt; Modell 0.1.0 trainiert (Test 2025: ROC-AUC 0.93, Log-Loss 0.28), `models/0.1.0/` in S3, Notebook mit Outputs committet, `phase-3-done` getaggt
 
 Reihenfolge bewusst: Setup → Layout/Schema → Target/Split → Feature-Pipeline → Data → Training → Eval/SHAP → Artefakt → Notebook → (Martin) Lauf+Upload → Abschluss. Die pure Logik (Target/Split/Features) kommt vor allem, was FastF1-Download braucht — so ist das Meiste offline + in CI testbar.
 

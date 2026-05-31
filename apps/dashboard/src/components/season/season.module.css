@@ -238,3 +238,26 @@
 .footer a {
   color: var(--accent);
 }
+
+/* ── Hero banner (Unsplash photo + overlay + checkered edge) ── */
+.banner {
+  position: relative;
+  border: 1px solid #181f2d;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+.bannerImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 35%;
+  opacity: 0.4;
+}
+.bannerInner {
+  position: relative;
+  padding: 1.5rem 1.5rem 1.85rem;
+  background: linear-gradient(118deg, rgba(8, 10, 15, 0.94) 28%, rgba(8, 10, 15, 0.5) 100%);
+}

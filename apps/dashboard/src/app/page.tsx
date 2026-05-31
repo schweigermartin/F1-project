@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { CheckeredStrip } from "../components/art/RaceArt";
 import seasonStyles from "../components/season/season.module.css";
 import {
   CalendarCard,
@@ -17,6 +18,7 @@ import {
   getSchedule,
   pickNextRace,
 } from "../lib/f1-api";
+import { PHOTOS, unsplash } from "../lib/images";
 
 export const metadata: Metadata = {
   title: "F1 Portfolio — Saison 2026",
@@ -40,28 +42,37 @@ export default async function HomePage(): Promise<ReactNode> {
 
   return (
     <main className={seasonStyles.page}>
-      <header>
-        <nav style={{ display: "flex", gap: "1.25rem" }}>
-          <Link href="/live" className={seasonStyles.back}>
-            Live-Dashboard →
-          </Link>
-          <Link href="/architecture" className={seasonStyles.back}>
-            Architektur →
-          </Link>
-        </nav>
-        <h1 className={seasonStyles.title}>F1 Portfolio — Saison 2026</h1>
-        <p className={seasonStyles.lead}>
-          Aktuelle Weltrangliste, der nächste Grand Prix und die jüngsten Ergebnisse — live aus der
-          freien Jolpica-F1-API, stündlich aktualisiert. Für die Live-Telemetrie geht es zum{" "}
-          <Link href="/live" style={{ color: "var(--accent)" }}>
-            Dashboard
-          </Link>
-          , zum Aufbau auf die{" "}
-          <Link href="/architecture" style={{ color: "var(--accent)" }}>
-            Architektur-Seite
-          </Link>
-          .
-        </p>
+      <header className={seasonStyles.banner}>
+        <img
+          className={seasonStyles.bannerImg}
+          src={unsplash(PHOTOS.carHero, 1600, 65)}
+          alt=""
+          aria-hidden
+        />
+        <div className={seasonStyles.bannerInner}>
+          <nav style={{ display: "flex", gap: "1.25rem" }}>
+            <Link href="/live" className={seasonStyles.back}>
+              Live-Dashboard →
+            </Link>
+            <Link href="/architecture" className={seasonStyles.back}>
+              Architektur →
+            </Link>
+          </nav>
+          <h1 className={seasonStyles.title}>F1 Portfolio — Saison 2026</h1>
+          <p className={seasonStyles.lead}>
+            Aktuelle Weltrangliste, der nächste Grand Prix und die jüngsten Ergebnisse — live aus
+            der freien Jolpica-F1-API, stündlich aktualisiert. Für die Live-Telemetrie geht es zum{" "}
+            <Link href="/live" style={{ color: "var(--accent)" }}>
+              Dashboard
+            </Link>
+            , zum Aufbau auf die{" "}
+            <Link href="/architecture" style={{ color: "var(--accent)" }}>
+              Architektur-Seite
+            </Link>
+            .
+          </p>
+        </div>
+        <CheckeredStrip height={12} />
       </header>
 
       <NextRaceHero race={nextRace} />

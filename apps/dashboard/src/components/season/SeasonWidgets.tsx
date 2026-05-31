@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 
 import type { ConstructorStanding, DriverStanding, LastRace, RaceMeta } from "../../lib/f1-api";
+import { countryToCode, nationalityToCode } from "../../lib/flags";
+import { Flag } from "../Flag";
 import { Countdown } from "./Countdown";
 import styles from "./season.module.css";
 
@@ -58,7 +60,13 @@ export function NextRaceHero({ race }: { race: RaceMeta | null }): ReactNode {
     <div className={styles.hero}>
       <div>
         <div className={styles.heroKicker}>Nächstes Rennen · Runde {race.round}</div>
-        <h2 className={styles.heroName}>{race.name}</h2>
+        <h2
+          className={styles.heroName}
+          style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}
+        >
+          <Flag code={countryToCode(race.country)} title={race.country} size={34} />
+          {race.name}
+        </h2>
         <div className={styles.heroMeta}>
           {race.circuit}
           {where ? ` · ${where}` : ""} · {fmtDate(race.date)}
@@ -90,8 +98,11 @@ export function DriverStandingsCard({ rows }: { rows: DriverStanding[] | null })
               <tr key={r.code + r.position}>
                 <td className={r.position === 1 ? styles.leaderPos : styles.pos}>{r.position}</td>
                 <td>
-                  <span className={styles.name}>{r.name}</span>
-                  <span className={styles.code}>{r.code}</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                    <Flag code={nationalityToCode(r.nationality)} title={r.nationality} size={18} />
+                    <span className={styles.name}>{r.name}</span>
+                    <span className={styles.code}>{r.code}</span>
+                  </span>
                 </td>
                 <td className={styles.sub}>{r.constructor}</td>
                 <td className={styles.num}>{r.wins}</td>
@@ -128,7 +139,12 @@ export function ConstructorStandingsCard({
             {rows.map((r) => (
               <tr key={r.name}>
                 <td className={r.position === 1 ? styles.leaderPos : styles.pos}>{r.position}</td>
-                <td className={styles.name}>{r.name}</td>
+                <td>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                    <Flag code={nationalityToCode(r.nationality)} title={r.nationality} size={18} />
+                    <span className={styles.name}>{r.name}</span>
+                  </span>
+                </td>
                 <td className={styles.num}>{r.wins}</td>
                 <td className={styles.pts}>{r.points}</td>
               </tr>
@@ -161,8 +177,11 @@ export function LastResultsCard({ race }: { race: LastRace | null }): ReactNode 
               <tr key={r.code + r.position}>
                 <td className={r.position === 1 ? styles.leaderPos : styles.pos}>{r.position}</td>
                 <td>
-                  <span className={styles.name}>{r.driver}</span>
-                  <span className={styles.code}>{r.code}</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                    <Flag code={nationalityToCode(r.nationality)} title={r.nationality} size={18} />
+                    <span className={styles.name}>{r.driver}</span>
+                    <span className={styles.code}>{r.code}</span>
+                  </span>
                 </td>
                 <td className={styles.sub}>{r.constructor}</td>
                 <td className={styles.sub}>{r.result}</td>
@@ -200,6 +219,7 @@ export function CalendarCard({
                 }`}
               >
                 <span className={styles.calRound}>R{r.round}</span>
+                <Flag code={countryToCode(r.country)} title={r.country} size={20} />
                 <span className={styles.calName}>
                   {r.name}
                   {isNext ? <span className={styles.nextTag}>nächstes</span> : null}

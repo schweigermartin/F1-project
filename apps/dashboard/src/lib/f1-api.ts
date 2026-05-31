@@ -167,6 +167,7 @@ export interface RaceResultRow {
   points: string;
   grid?: string;
   result: string; // finishing time or status
+  nationality?: string;
 }
 
 export interface LastRace {
@@ -244,6 +245,7 @@ export async function getLastResults(): Promise<LastRace | null> {
       points: r.points,
       ...(r.grid ? { grid: r.grid } : {}),
       result: r.Time?.time ?? r.status ?? "—",
+      ...(r.Driver.nationality ? { nationality: r.Driver.nationality } : {}),
     })),
   };
 }

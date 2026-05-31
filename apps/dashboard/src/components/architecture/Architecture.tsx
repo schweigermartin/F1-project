@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { STATS } from "../../lib/architecture-data";
+import { PHOTOS, unsplash } from "../../lib/images";
+import { F1Car } from "../art/RaceArt";
 import styles from "./architecture.module.css";
 import { ModelExplainer } from "./ModelExplainer";
 import { PipelineDiagram } from "./PipelineDiagram";
@@ -15,25 +17,44 @@ import { TechStack } from "./TechStack";
 export function Architecture(): ReactNode {
   return (
     <main className={styles.page}>
-      <header className={styles.hero}>
-        <Link href="/" className={styles.back}>
-          ← Start
-        </Link>
-        <h1 className={styles.title}>Wie das hier gebaut ist</h1>
-        <p className={styles.lead}>
-          Ein F1-Portfolio aus zwei Systemen auf einer gemeinsamen AWS-Pipeline: ein{" "}
-          <strong style={{ color: "var(--fg)" }}>Live-Telemetrie-Dashboard</strong> und ein{" "}
-          <strong style={{ color: "var(--fg)" }}>ML-Podium-Predictor</strong>. Alles serverless, als
-          Code, mit fast keinen Laufkosten. Unten: der Datenfluss in Echtzeit, das Modell und die
-          Werkzeuge dahinter.
-        </p>
-        <div className={styles.stats}>
-          {STATS.map((s) => (
-            <div key={s.label} className={styles.stat}>
-              <span className={styles.statValue}>{s.value}</span>
-              <span className={styles.statLabel}>{s.label}</span>
-            </div>
-          ))}
+      <header className={styles.heroBanner}>
+        <img
+          className={styles.heroImg}
+          src={unsplash(PHOTOS.carWide, 1600, 65)}
+          alt=""
+          aria-hidden
+        />
+        <F1Car
+          style={{
+            position: "absolute",
+            right: "1.25rem",
+            bottom: "0.9rem",
+            width: 200,
+            color: "#1b2433",
+            opacity: 0.55,
+            pointerEvents: "none",
+          }}
+        />
+        <div className={styles.heroInner}>
+          <Link href="/" className={styles.back}>
+            ← Start
+          </Link>
+          <h1 className={styles.title}>Wie das hier gebaut ist</h1>
+          <p className={styles.lead}>
+            Ein F1-Portfolio aus zwei Systemen auf einer gemeinsamen AWS-Pipeline: ein{" "}
+            <strong style={{ color: "var(--fg)" }}>Live-Telemetrie-Dashboard</strong> und ein{" "}
+            <strong style={{ color: "var(--fg)" }}>ML-Podium-Predictor</strong>. Alles serverless,
+            als Code, mit fast keinen Laufkosten. Unten: der Datenfluss in Echtzeit, das Modell und
+            die Werkzeuge dahinter.
+          </p>
+          <div className={styles.stats}>
+            {STATS.map((s) => (
+              <div key={s.label} className={styles.stat}>
+                <span className={styles.statValue}>{s.value}</span>
+                <span className={styles.statLabel}>{s.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </header>
 

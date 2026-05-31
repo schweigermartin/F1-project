@@ -1,0 +1,336 @@
+/* Scoped styling for the /architecture showcase. Inline styles can't do :hover,
+   gradients-on-text or keyframes, so the page's presentational layer lives here;
+   dynamic values (SVG coords, per-group colours) stay inline in the components. */
+
+.page {
+  padding: 1.5rem 1.25rem 3rem;
+  max-width: 1060px;
+  margin: 0 auto;
+}
+
+.back {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.85rem;
+  transition: color 0.15s;
+}
+.back:hover {
+  color: var(--fg);
+}
+
+/* ── Hero ── */
+.hero {
+  padding: 0.75rem 0 0.5rem;
+}
+.title {
+  font-size: clamp(1.9rem, 4.5vw, 2.8rem);
+  line-height: 1.08;
+  margin: 0.6rem 0 0.7rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(96deg, #ffffff 18%, #ff5650 58%, #e10600 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.lead {
+  margin: 0;
+  color: #aab3c2;
+  max-width: 700px;
+  line-height: 1.6;
+  font-size: 1.04rem;
+}
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.4rem;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0.55rem 0.95rem;
+  background: linear-gradient(160deg, #131a25, #0c1018);
+  border: 1px solid #1d2433;
+  border-radius: 11px;
+  min-width: 86px;
+}
+.statValue {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--fg);
+}
+.statLabel {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Sections ── */
+.section {
+  background: linear-gradient(165deg, #0e131c, #0a0e15);
+  border: 1px solid #181f2d;
+  border-radius: 16px;
+  padding: 1.4rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.sectionNum {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(160deg, #e10600, #9c0400);
+  flex: none;
+}
+.kicker {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--accent);
+  font-weight: 700;
+}
+.sectionTitle {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+.sectionLead {
+  margin: 0.65rem 0 1.3rem;
+  color: #aab3c2;
+  line-height: 1.6;
+  max-width: 760px;
+}
+
+/* ── Pipeline diagram ── */
+.diagramWrap {
+  background: radial-gradient(ellipse 80% 70% at 35% -10%, #141d2b 0%, #0a0e15 72%);
+  border: 1px solid #141b27;
+  border-radius: 12px;
+  padding: 0.5rem 0.5rem 0.25rem;
+}
+.node {
+  cursor: pointer;
+  outline: none;
+  transition:
+    opacity 0.25s ease,
+    transform 0.18s ease;
+}
+.flowLine {
+  animation: flowdash 0.9s linear infinite;
+}
+@keyframes flowdash {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.7rem;
+  margin-top: 0.9rem;
+}
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0.3rem 0.65rem;
+  background: #11161f;
+  border: 1px solid #1d2433;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.legendDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+
+.panel {
+  margin-top: 0.9rem;
+  min-height: 92px;
+  background: linear-gradient(160deg, #11161f, #0b0f16);
+  border: 1px solid #1d2433;
+  border-radius: 12px;
+  padding: 0.95rem 1.1rem;
+}
+.panelChip {
+  display: inline-block;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.panelPlain {
+  margin: 0.55rem 0 0.4rem;
+  font-size: 1.02rem;
+  color: var(--fg);
+  line-height: 1.45;
+  font-weight: 600;
+}
+.panelTech {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.panelHint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+/* ── Tech stack ── */
+.techGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: 1rem;
+}
+.techCard {
+  background: linear-gradient(165deg, #0f141d, #0a0e15);
+  border: 1px solid #1a212e;
+  border-top: 3px solid var(--cardAccent, #e10600);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.techCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 26px -14px rgba(0, 0, 0, 0.8);
+}
+.techHead {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.85rem;
+}
+.techIcon {
+  font-size: 1.3rem;
+}
+.techTitle {
+  margin: 0;
+  font-size: 0.98rem;
+}
+.techList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+.techName {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.techWhy {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* ── ML model ── */
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 0.8rem;
+  margin-top: 1.3rem;
+}
+.metricCard {
+  background: #0d121b;
+  border: 1px solid #1d2433;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+}
+.metricLabel {
+  font-size: 0.74rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.metricRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0.3rem 0 0.2rem;
+}
+.metricModel {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.metricBase {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.metricHint {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.win {
+  color: #2ec75f;
+}
+
+.example {
+  margin-top: 1.2rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.85rem;
+  padding: 0.8rem 1.05rem;
+  background: linear-gradient(160deg, #12161f, #0c1018);
+  border: 1px solid #1d2433;
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+.exampleProb {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(225, 6, 0, 0.12);
+  color: #ff6b66;
+  border: 1px solid rgba(225, 6, 0, 0.3);
+}
+
+.footer {
+  margin: 2rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.footer a {
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flowLine {
+    animation: none;
+  }
+  .techCard {
+    transition: none;
+  }
+}

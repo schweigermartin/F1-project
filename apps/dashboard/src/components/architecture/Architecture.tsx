@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { STATS } from "../../lib/architecture-data";
+import styles from "./architecture.module.css";
 import { ModelExplainer } from "./ModelExplainer";
 import { PipelineDiagram } from "./PipelineDiagram";
 import { TechStack } from "./TechStack";
@@ -8,47 +10,63 @@ import { TechStack } from "./TechStack";
 /**
  * The /architecture showcase: explains the system for a recruiter-facing audience
  * (Constitution XII) — the live AWS pipeline (interactive), the ML model, and the
- * tech stack. Composed from data-driven sections.
+ * tech stack. Plain-language leads up top, detail on hover.
  */
 export function Architecture(): ReactNode {
   return (
-    <main style={{ padding: "1.5rem", maxWidth: 1040, margin: "0 auto" }}>
-      <header style={{ marginBottom: "1.5rem" }}>
-        <Link
-          href="/"
-          style={{ color: "var(--muted)", textDecoration: "none", fontSize: "0.85rem" }}
-        >
+    <main className={styles.page}>
+      <header className={styles.hero}>
+        <Link href="/" className={styles.back}>
           ← Live-Dashboard
         </Link>
-        <h1 style={{ color: "var(--accent)", margin: "0.5rem 0 0.4rem" }}>
-          Wie das hier gebaut ist
-        </h1>
-        <p style={{ margin: 0, color: "var(--muted)", maxWidth: 640, lineHeight: 1.55 }}>
-          Zwei Systeme auf einer event-driven AWS-Pipeline: ein Live-Telemetrie-Dashboard und ein
-          ML-Podium-Predictor. Unten der Datenfluss in Echtzeit, das Modell und der Stack.
+        <h1 className={styles.title}>Wie das hier gebaut ist</h1>
+        <p className={styles.lead}>
+          Ein F1-Portfolio aus zwei Systemen auf einer gemeinsamen AWS-Pipeline: ein{" "}
+          <strong style={{ color: "var(--fg)" }}>Live-Telemetrie-Dashboard</strong> und ein{" "}
+          <strong style={{ color: "var(--fg)" }}>ML-Podium-Predictor</strong>. Alles serverless, als
+          Code, mit fast keinen Laufkosten. Unten: der Datenfluss in Echtzeit, das Modell und die
+          Werkzeuge dahinter.
         </p>
+        <div className={styles.stats}>
+          {STATS.map((s) => (
+            <div key={s.label} className={styles.stat}>
+              <span className={styles.statValue}>{s.value}</span>
+              <span className={styles.statLabel}>{s.label}</span>
+            </div>
+          ))}
+        </div>
       </header>
 
-      <Section title="Live-Telemetrie-Pipeline" subtitle="event-driven · serverless · Echtzeit">
+      <Section
+        n={1}
+        kicker="Echtzeit · serverless"
+        title="Live-Telemetrie-Pipeline"
+        lead="Vom Renndaten-Feed bis in deinen Browser — ohne ständiges Nachladen. Jede Komponente macht genau eine Sache; gepollt wird nur, während eine Session läuft. Fahr mit der Maus über die Bausteine, um zu sehen, was jeder tut."
+      >
         <PipelineDiagram />
       </Section>
 
-      <Section title="Podium-Predictor (ML)" subtitle="XGBoost · SHAP · vs. Baseline">
+      <Section
+        n={2}
+        kicker="Machine Learning"
+        title="Podium-Predictor"
+        lead="Aus historischen Renndaten lernt ein Modell, wer aufs Podium fährt — und erklärt per SHAP, warum. Wichtig: Es nutzt nur Wissen von vor dem Start, damit die Vorhersage ehrlich bleibt."
+      >
         <ModelExplainer />
       </Section>
 
-      <Section title="Tech-Stack" subtitle="Womit — und warum">
+      <Section
+        n={3}
+        kicker="Werkzeuge"
+        title="Tech-Stack"
+        lead="Bewusst gewählt — jede Zeile mit einem Grund. Schlanke Bausteine statt Framework-Ballast."
+      >
         <TechStack />
       </Section>
 
-      <footer style={{ margin: "2rem 0 1rem", color: "var(--muted)", fontSize: "0.8rem" }}>
+      <footer className={styles.footer}>
         Spec-Driven gebaut (spec → plan → tasks → code). Code + Architektur:{" "}
-        <a
-          href="https://github.com/schweigermartin/F1-project"
-          style={{ color: "var(--accent)" }}
-          target="_blank"
-          rel="noreferrer"
-        >
+        <a href="https://github.com/schweigermartin/F1-project" target="_blank" rel="noreferrer">
           GitHub
         </a>
         .
@@ -59,27 +77,29 @@ export function Architecture(): ReactNode {
 
 function Section({
   children,
-  subtitle,
+  kicker,
+  lead,
+  n,
   title,
 }: {
   children: ReactNode;
-  subtitle: string;
+  kicker: string;
+  lead: string;
+  n: number;
   title: string;
 }): ReactNode {
   return (
-    <section
-      style={{
-        background: "#0b0f16",
-        border: "1px solid #161c28",
-        borderRadius: 12,
-        padding: "1.25rem 1.4rem",
-        marginBottom: "1.5rem",
-      }}
-    >
-      <div style={{ marginBottom: "1rem" }}>
-        <h2 style={{ margin: 0, fontSize: "1.1rem" }}>{title}</h2>
-        <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>{subtitle}</span>
+    <section className={styles.section}>
+      <div className={styles.sectionHead}>
+        <span className={styles.sectionNum} aria-hidden>
+          {n}
+        </span>
+        <div>
+          <div className={styles.kicker}>{kicker}</div>
+          <h2 className={styles.sectionTitle}>{title}</h2>
+        </div>
       </div>
+      <p className={styles.sectionLead}>{lead}</p>
       {children}
     </section>
   );

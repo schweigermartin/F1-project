@@ -1,36 +1,29 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { TECH_STACK } from "../../lib/architecture-data";
+import styles from "./architecture.module.css";
 
-/** Grouped tech-stack cards with a one-line rationale per choice. */
+/** Grouped tech-stack cards with a one-line rationale per choice; hover to lift. */
 export function TechStack(): ReactNode {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-        gap: "1rem",
-      }}
-    >
+    <div className={styles.techGrid}>
       {TECH_STACK.map((cat) => (
         <section
           key={cat.title}
-          style={{
-            background: "#0e131b",
-            border: "1px solid #1c2230",
-            borderRadius: 10,
-            padding: "1rem 1.1rem",
-            borderTop: `3px solid ${cat.accent}`,
-          }}
+          className={styles.techCard}
+          style={{ "--cardAccent": cat.accent } as CSSProperties}
         >
-          <h3 style={{ margin: "0 0 0.75rem", fontSize: "0.95rem" }}>{cat.title}</h3>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: "0.6rem" }}>
+          <div className={styles.techHead}>
+            <span className={styles.techIcon} aria-hidden>
+              {cat.icon}
+            </span>
+            <h3 className={styles.techTitle}>{cat.title}</h3>
+          </div>
+          <ul className={styles.techList}>
             {cat.items.map((it) => (
               <li key={it.name}>
-                <div style={{ fontSize: "0.88rem", fontWeight: 600 }}>{it.name}</div>
-                <div style={{ fontSize: "0.8rem", color: "var(--muted)", lineHeight: 1.4 }}>
-                  {it.why}
-                </div>
+                <div className={styles.techName}>{it.name}</div>
+                <div className={styles.techWhy}>{it.why}</div>
               </li>
             ))}
           </ul>

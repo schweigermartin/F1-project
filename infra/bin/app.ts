@@ -2,6 +2,7 @@
 import { App, Tags } from "aws-cdk-lib";
 
 import { DataLayerStack } from "../lib/data-layer-stack.js";
+import { InferenceStack } from "../lib/inference-stack.js";
 import { PipelineStack } from "../lib/pipeline-stack.js";
 import { RealtimeStack } from "../lib/realtime-stack.js";
 
@@ -35,6 +36,14 @@ new RealtimeStack(app, "F1-Realtime", {
   // deploys) must be added here explicitly. The origin is only the cheap first
   // filter; the real gate is the HMAC token (server-minted, WS_TOKEN_SECRET).
   allowedOrigins: ["https://f1-project-zeta.vercel.app", "http://localhost:3000"],
+});
+
+new InferenceStack(app, "F1-Inference", {
+  env,
+  description:
+    "Race outcome predictor (T-60min inference λ → XGBoost + Bedrock explanations → F1Predictions).",
+  dataBucket: dataLayer.dataBucket,
+  alertTopic: pipeline.alertTopic,
 });
 
 // Constitution Artikel III: every resource gets these tags so we can audit

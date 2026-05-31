@@ -67,8 +67,9 @@ Reihenfolge bewusst: Setup → Layout/Schema → Target/Split → Feature-Pipeli
 
 ### T10 — Artefakt + Model-Card (`artifact.py`)
 
-- **Output:** `save_model_json`, `render_model_card(metrics, meta)` aus Template, `upload(version)` nach `models/<semver>/` (boto3); ohne Creds Fallback `ml/artifacts/<semver>/` + Log. `model_card_template.md`.
-- **Verify:** Test: lokaler Write + Card-Render (Metriken eingesetzt); S3-Upload gegen `moto`/Mock oder local-fallback-Pfad.
+- **Output:** `render_model_card(ModelCardMeta)` (Markdown im Code statt externem Template — nichts zu verlieren), `write_local`/`upload_s3` (boto3), `publish(...)` schreibt **immer** lokal + lädt nach `models/<semver>/` hoch wenn Client+Bucket da, sonst Fallback `ml/artifacts/<semver>/` + Log. Pfade aus `layout.py` (Constitution IX, nie `latest/`).
+- **Verify:** 3 Tests — Card enthält Metriken/Features/Baseline; `publish` schreibt model.json + model_card.md lokal (tmp_path); **S3-Upload gegen `moto`** landet an `model_artifact_key`/`model_card_key`. ruff + mypy (11) + pytest (49) grün.
+- **Notes:** Card als Code-Template (statt `model_card_template.md`) — robuster/testbarer, kein File-IO-Risiko.
 
 ### T11 — Notebook (`ml/notebooks/train_podium_model.ipynb`)
 

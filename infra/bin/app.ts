@@ -29,6 +29,13 @@ new RealtimeStack(app, "F1-Realtime", {
   liveTable: pipeline.liveTable,
   dataBucket: dataLayer.dataBucket,
   alertTopic: pipeline.alertTopic,
+  // $connect origin allowlist (Constitution VII). Exact prod origin + local
+  // dev; deliberately not a `*.vercel.app` wildcard (preview deploys can't
+  // open the public socket). Add a wildcard entry here if previews need it.
+  allowedOrigins: [
+    "https://f1-project-martins-projects-bec7d357.vercel.app",
+    "http://localhost:3000",
+  ],
 });
 
 // Constitution Artikel III: every resource gets these tags so we can audit

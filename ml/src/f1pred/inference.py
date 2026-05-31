@@ -217,3 +217,54 @@ def build_race_features(
         logger.warning("dropping driver %s: no prior history for %s", driver, race_date)
 
     return merged.loc[:, OUTPUT_COLUMNS].reset_index(drop=True)
+
+
+# ─── Default FastF1-backed quali loader (real run only, not in CI) ────────────
+
+
+def fastf1_load_quali(race_date: str, round_number: int) -> pd.DataFrame | None:
+    """Load the just-completed qualifying for an upcoming race as a QUALI_COLUMNS
+    frame (the `LoadQuali` the lambda injects). None on missing data; rate limits
+    propagate so the caller can back off (mirrors `data.fastf1_load_race`). Not
+    exercised in CI — the unit tests inject a fake loader instead."""
+    import fastf1  # noqa: PLC0415 — lazy so the module imports without FastF1
+    from fastf1.exceptions import RateLimitExceededError  # noqa: PLC0415
+
+    # Reuse the Phase-3 gap/cache helpers — no duplicated quali logic (Const. III).
+    from f1pred.data import _enable_cache, _quali_gap_seconds, _to_int  # noqa: PLC0415
+
+    year = int(race_date[:4])
+    _enable_cache()
+    try:
+        quali = fastf1.get_session(year, round_number, "Q")
+        quali.load(telemetry=False, weather=True, messages=False)
+    except RateLimitExceededError:
+        raise
+    except Exception as exc:  # noqa: BLE001 — FastF1 raises broadly on missing data
+        logger.warning("FastF1 quali load failed for %s round %s: %s", race_date, round_number, exc)
+        return None
+
+    qres = getattr(quali, "results", None)
+    if qres is None or len(qres) == 0:
+        return None
+
+    pole_time = qres["Q3"].dropna().min() if "Q3" in qres else None
+    is_wet = bool(getattr(quali, "weather_data", pd.DataFrame()).get("Rainfall", pd.Series()).any())
+    circuit = str(quali.event["EventName"])
+
+    rows = []
+    for _, r in qres.iterrows():
+        code = str(r["Abbreviation"])
+        rows.append(
+            {
+                "driver_number": _to_int(r.get("DriverNumber")),
+                "driver_code": code,
+                "driver": code,
+                "constructor": str(r["TeamName"]),
+                "circuit": circuit,
+                "grid_position": _to_int(r.get("Position")),  # quali classification
+                "quali_gap_to_pole_s": _quali_gap_seconds(quali, code, pole_time),
+                "is_wet": is_wet,
+            }
+        )
+    return pd.DataFrame(rows, columns=QUALI_COLUMNS)

@@ -1,3 +1,4 @@
+export * from "./bedrock-prompts.js";
 export * from "./connections-keys.js";
 export * from "./ddb-keys.js";
 export * from "./event-schema.js";

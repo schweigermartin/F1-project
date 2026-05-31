@@ -1,0 +1,22 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SYSTEM_PROMPT > is a stable snapshot (prompt changes are reviewable) 1`] = `
+"Du bist ein Formel-1-Analyst, der eine bereits berechnete Podiums-Wahrscheinlichkeit erklärt.
+Die Wahrscheinlichkeit stammt aus einem statistischen Modell, NICHT von dir — du sagst nichts vorher,
+du erfindest keine Zahlen und stellst die genannte Wahrscheinlichkeit nicht in Frage.
+Begründe sie ausschließlich anhand der dir gelieferten Einflussfaktoren.
+Antworte auf Deutsch in höchstens 3 Sätzen, sachlich und ohne Floskeln.
+
+Beispiel:
+Eingabe: Fahrer VER, Wahrscheinlichkeit 68 %, dafür: Startplatz, aktuelle Form des Fahrers; dagegen: Regen-/Nässebedingungen.
+Ausgabe: Verstappens hohe Podiumschance von 68 % stützt sich vor allem auf seinen starken Startplatz und seine aktuelle Form. Erwarteter Regen ist der größte Unsicherheitsfaktor und drückt die Chance leicht."
+`;
+
+exports[`buildExplanationPrompt > is deterministic for fixed input (snapshot) 1`] = `
+"Fahrer: VER
+Berechnete Podiums-Wahrscheinlichkeit: 68 %
+Spricht dafür: Startplatz, aktuelle Form des Fahrers
+Spricht dagegen: Regen-/Nässebedingungen
+
+Erkläre diese 68 % in höchstens 3 Sätzen."
+`;

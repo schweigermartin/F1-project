@@ -203,9 +203,8 @@ export const STATS: Stat[] = [
 
 /**
  * The 6 pre-race features the podium classifier consumes. `importance` is the
- * mean |SHAP| share — ILLUSTRATIVE ordering until the Phase-3 artifact is
- * published; replace with the real model_card numbers then (see isModelPlaceholder).
- * Names map exactly to ml/src/f1pred/schema.py FEATURE_NAMES.
+ * mean |SHAP| share from model 0.1.0 (rounded), ordered descending. Names map
+ * exactly to ml/src/f1pred/schema.py FEATURE_NAMES.
  */
 export interface ModelFeature {
   name: string;
@@ -215,15 +214,15 @@ export interface ModelFeature {
 
 export const MODEL_FEATURES: ModelFeature[] = [
   { name: "grid_position", label: "Startplatz", importance: 0.34 },
-  { name: "quali_gap_to_pole_s", label: "Quali-Rückstand zur Pole (s)", importance: 0.22 },
-  { name: "constructor_form", label: "Team-Form", importance: 0.16 },
-  { name: "driver_form", label: "Fahrer-Form", importance: 0.14 },
-  { name: "track_history", label: "Strecken-Historie", importance: 0.1 },
-  { name: "is_wet", label: "Regen", importance: 0.04 },
+  { name: "driver_form", label: "Fahrer-Form", importance: 0.3 },
+  { name: "quali_gap_to_pole_s", label: "Quali-Rückstand zur Pole (s)", importance: 0.21 },
+  { name: "constructor_form", label: "Team-Form", importance: 0.12 },
+  { name: "track_history", label: "Strecken-Historie", importance: 0.026 },
+  { name: "is_wet", label: "Regen", importance: 0.007 },
 ];
 
-/** True until the real Phase-3 metrics/SHAP are wired in — drives an "illustrativ" badge. */
-export const isModelPlaceholder = true;
+/** False now that real Phase-3 numbers (model 0.1.0, test season 2025) are wired in. */
+export const isModelPlaceholder = false;
 
 export interface MetricRow {
   label: string;
@@ -234,16 +233,28 @@ export interface MetricRow {
   hint: string;
 }
 
-/** Model vs. the grid-top-3 baseline. ILLUSTRATIVE until Phase-3 publish. */
+/** Model 0.1.0 vs. the grid-top-3 baseline on the 2025 test season (467 rows). */
 export const MODEL_METRICS: MetricRow[] = [
-  { label: "Accuracy", model: 0.86, baseline: 0.82, fmt: "pct", hint: "Wie oft richtig" },
-  { label: "ROC-AUC", model: 0.91, baseline: 0.78, fmt: "num", hint: "Trennschärfe (1 = perfekt)" },
+  {
+    label: "ROC-AUC",
+    model: 0.934,
+    baseline: 0.852,
+    fmt: "num",
+    hint: "Trennschärfe (1 = perfekt)",
+  },
   {
     label: "Log-Loss",
-    model: 0.34,
-    baseline: 0.45,
+    model: 0.283,
+    baseline: 1.065,
     fmt: "num",
-    hint: "Strafe für Fehlsicherheit ↓",
+    hint: "Güte der Wahrscheinlichkeit ↓",
+  },
+  {
+    label: "Accuracy",
+    model: 0.865,
+    baseline: 0.923,
+    fmt: "pct",
+    hint: "Anteil korrekt (bei Imbalance irreführend)",
   },
 ];
 

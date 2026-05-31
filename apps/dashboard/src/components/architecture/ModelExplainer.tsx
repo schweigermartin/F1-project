@@ -19,8 +19,8 @@ const LABEL_W = 210;
 /**
  * Explains the Phase-3 podium classifier in plain language: the 6 pre-race
  * features ranked by SHAP importance, the model vs. the grid-top-3 baseline, and
- * one worked example. Values are illustrative until the artifact publishes
- * (isModelPlaceholder).
+ * one worked example. Numbers are the real model 0.1.0 on the 2025 test season
+ * (architecture-data.ts).
  */
 export function ModelExplainer(): ReactNode {
   const maxImp = Math.max(...MODEL_FEATURES.map((f) => f.importance));
@@ -104,6 +104,20 @@ export function ModelExplainer(): ReactNode {
           <MetricCard key={m.label} row={m} />
         ))}
       </div>
+      <p
+        style={{
+          margin: "0.7rem 0 0",
+          fontSize: "0.82rem",
+          color: "var(--muted)",
+          lineHeight: 1.5,
+        }}
+      >
+        Bei der rohen Accuracy liegt die Baseline vorn — auf einem unbalancierten Ziel (die meisten
+        fahren nicht aufs Podium) wird die starre Regel dafür belohnt. Für die{" "}
+        <strong style={{ color: "var(--fg)" }}>Wahrscheinlichkeiten</strong>, die das Projekt
+        braucht, zählen AUC und Log-Loss — da gewinnt das Modell klar, und es erkennt 86 % der
+        echten Podien (Baseline 75 %).
+      </p>
 
       <div className={styles.example}>
         <span style={{ color: "var(--muted)" }}>Beispiel:</span>

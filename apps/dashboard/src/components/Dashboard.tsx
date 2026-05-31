@@ -51,8 +51,14 @@ export function Dashboard(): ReactNode {
           marginBottom: "1rem",
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: "1rem" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "1rem", flexWrap: "wrap" }}>
           <h1 style={{ color: "var(--accent)", margin: 0 }}>F1 Live Dashboard</h1>
+          <Link
+            href="/season"
+            style={{ color: "var(--muted)", textDecoration: "none", fontSize: "0.85rem" }}
+          >
+            Saison →
+          </Link>
           <Link
             href="/architecture"
             style={{ color: "var(--muted)", textDecoration: "none", fontSize: "0.85rem" }}

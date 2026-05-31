@@ -50,10 +50,10 @@ Reihenfolge bewusst: Setup → Layout/Schema → Target/Split → Feature-Pipeli
 - **Output:** `load_seasons(years, *, rounds_for_year, load_race)` — konkatiniert normalisierte Race-Frames (`RACE_COLUMNS`), fehlende Runde → skip + log (R-4). Default-Loader `fastf1_load_race`/`fastf1_rounds_for_year` mit **lazy** FastF1-Import + Cache `.fastf1-cache/` (Quali-Gap-zu-Pole, Regen-Flag, Coercion-Helfer). FastF1-Pfad nur im echten Lauf (T12) ausgeführt.
 - **Verify:** 3 Tests (Konkatenation, skip-bei-None, leerer Frame mit korrekten Spalten) gegen injizierte Fake-Loader — **kein FastF1/Netzwerk**. ruff + mypy (7) + pytest (25) grün.
 
-### T7 — Training (`train.py`)
+### T7 — Training (`train.py`) — DONE
 
-- **Output:** `train_podium(X_train, y_train, X_val, y_val)` → `XGBClassifier`, fixer `random_state`, `scale_pos_weight = neg/pos`, dokumentiertes HP-Set, Early-Stopping auf Val.
-- **Verify:** Test: trainiert auf synthetischem Set, gibt Booster zurück; **gleicher Seed → gleicher Score** (Reproduzierbarkeit, AC-8).
+- **Output:** `train_podium(x_train, y_train, x_val, y_val, *, params, early_stopping_rounds=30)` → `XGBClassifier`. `RANDOM_STATE=42`, `n_jobs=1`, `tree_method="hist"` → deterministisch (AC-8). `scale_pos_weight(y) = neg/pos` (AC-4). Dokumentiertes Default-HP-Set, Early-Stopping auf Val, Features in kanonischer Reihenfolge + `astype(float)` (is_wet→0/1). pyproject `xgboost~=3.0` (auf getestete Major nachgezogen).
+- **Verify:** 4 Tests (scale_pos_weight neg/pos + no-positives; trainiert + predict_proba-Shape; **gleicher Seed → identische proba**, AC-8) auf synthetischen Fixtures (`conftest.py`). ruff + mypy (8) + pytest (29) grün (lokal mit `brew install libomp`).
 
 ### T8 — Evaluation + Baseline (`evaluate.py`)
 

@@ -80,10 +80,10 @@ export function useRaceSocket(): RaceSocketControls {
   return {
     startReplay: (sessionId, speed) => {
       useRaceStore.getState().setMode("replay");
-      ref.current?.send({ action: "replay:start", session_id: sessionId, speed });
+      ref.current?.send({ action: "replayStart", session_id: sessionId, speed });
     },
     stopReplay: () => {
-      ref.current?.send({ action: "replay:stop" });
+      ref.current?.send({ action: "replayStop" });
       useRaceStore.getState().setMode("live");
     },
   };

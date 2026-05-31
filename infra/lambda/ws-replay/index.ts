@@ -143,7 +143,7 @@ export async function handler(
     return { statusCode: 400 };
   }
 
-  if (message.action === "replay:stop") {
+  if (message.action === "replayStop") {
     await ddb.send(
       new UpdateCommand({
         TableName: CONNECTIONS_TABLE,
@@ -155,7 +155,7 @@ export async function handler(
     return { statusCode: 200 };
   }
 
-  if (message.action === "replay:start") {
+  if (message.action === "replayStart") {
     const replayId = randomUUID();
     // Reset abort + claim the chain with a fresh replayId. Then hand off to an
     // async invocation so the playback isn't bound by the 29s WS integration

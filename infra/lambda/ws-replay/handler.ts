@@ -10,8 +10,8 @@ import { PipelineEventSchema, type ServerMessage } from "@f1/shared";
  *
  * Long sessions outrun the 15-min Lambda wall, so a single invocation plays a
  * bounded wall-budget chunk, then re-invokes itself with the next cursor
- * (Self-Continuation, R-3). A replayId guards the chain: replay:stop /
- * disconnect / a fresh replay:start all make `isAborted` return true, so an
+ * (Self-Continuation, R-3). A replayId guards the chain: replayStop /
+ * disconnect / a fresh replayStart all make `isAborted` return true, so an
  * orphaned chain dies on its next abort check.
  */
 
@@ -37,7 +37,7 @@ export interface TimedDelta {
 export interface ReplayInput {
   session_id: string;
   speed: 1 | 2 | 4;
-  /** Resume index into the timeline; 0 on a fresh replay:start. */
+  /** Resume index into the timeline; 0 on a fresh replayStart. */
   cursor?: number;
   /** Injectable for tests; defaults to REPLAY_WALL_BUDGET_MS. */
   wallBudgetMs?: number;
@@ -48,7 +48,7 @@ export interface ReplayDeps {
   loadLines: (sessionId: string) => Promise<string[] | null>;
   /** PostToConnection; reject with `{ gone: true }` on a 410. */
   post: (message: ServerMessage) => Promise<void>;
-  /** True if the replay should stop (disconnect / replay:stop / superseded). */
+  /** True if the replay should stop (disconnect / replayStop / superseded). */
   isAborted: () => Promise<boolean>;
   /** Async self-invoke to play the next chunk from `cursor`. */
   scheduleContinuation: (cursor: number) => Promise<void>;

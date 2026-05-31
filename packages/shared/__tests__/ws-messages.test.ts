@@ -18,24 +18,24 @@ describe("ClientMessageSchema", () => {
     expect(() => ClientMessageSchema.parse({ action: "subscribe" })).not.toThrow();
   });
 
-  it("accepts replay:start with an allowed speed", () => {
+  it("accepts replayStart with an allowed speed", () => {
     expect(() =>
-      ClientMessageSchema.parse({ action: "replay:start", session_id: "11291", speed: 4 }),
+      ClientMessageSchema.parse({ action: "replayStart", session_id: "11291", speed: 4 }),
     ).not.toThrow();
   });
 
-  it("rejects replay:start with a disallowed speed", () => {
+  it("rejects replayStart with a disallowed speed", () => {
     expect(() =>
-      ClientMessageSchema.parse({ action: "replay:start", session_id: "11291", speed: 3 }),
+      ClientMessageSchema.parse({ action: "replayStart", session_id: "11291", speed: 3 }),
     ).toThrow();
   });
 
-  it("rejects replay:start without a session_id", () => {
-    expect(() => ClientMessageSchema.parse({ action: "replay:start", speed: 2 })).toThrow();
+  it("rejects replayStart without a session_id", () => {
+    expect(() => ClientMessageSchema.parse({ action: "replayStart", speed: 2 })).toThrow();
   });
 
-  it("accepts replay:stop", () => {
-    expect(() => ClientMessageSchema.parse({ action: "replay:stop" })).not.toThrow();
+  it("accepts replayStop", () => {
+    expect(() => ClientMessageSchema.parse({ action: "replayStop" })).not.toThrow();
   });
 
   it("rejects an unknown action", () => {

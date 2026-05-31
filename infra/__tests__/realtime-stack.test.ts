@@ -198,10 +198,10 @@ describe("RealtimeStack — fanout", () => {
 });
 
 describe("RealtimeStack — replay", () => {
-  it("wires replay:start and replay:stop routes", () => {
+  it("wires replayStart and replayStop routes", () => {
     const t = synth();
-    t.hasResourceProperties("AWS::ApiGatewayV2::Route", { RouteKey: "replay:start" });
-    t.hasResourceProperties("AWS::ApiGatewayV2::Route", { RouteKey: "replay:stop" });
+    t.hasResourceProperties("AWS::ApiGatewayV2::Route", { RouteKey: "replayStart" });
+    t.hasResourceProperties("AWS::ApiGatewayV2::Route", { RouteKey: "replayStop" });
   });
 
   it("lets replay read the S3 archive and self-invoke for continuation", () => {
@@ -299,6 +299,6 @@ describe("RealtimeStack — IAM least privilege (T7)", () => {
     const keys = Object.values(routes)
       .map((r) => r.Properties?.RouteKey)
       .sort();
-    expect(keys).toEqual(["$connect", "$disconnect", "replay:start", "replay:stop", "subscribe"]);
+    expect(keys).toEqual(["$connect", "$disconnect", "replayStart", "replayStop", "subscribe"]);
   });
 });

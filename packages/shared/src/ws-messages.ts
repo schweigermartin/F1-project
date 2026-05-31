@@ -53,14 +53,18 @@ export const SubscribeMessageSchema = z.object({
   session_id: z.string().optional(),
 });
 
+// `action` doubles as the API Gateway WebSocket route key (route selection is
+// `$request.body.action`), and route keys reject colons — hence camelCase, not
+// `replay:start`. The server-side `replay:end` *type* is unaffected: it's a
+// ServerMessage discriminator, never a route key.
 export const ReplayStartMessageSchema = z.object({
-  action: z.literal("replay:start"),
+  action: z.literal("replayStart"),
   session_id: z.string(),
   speed: ReplaySpeedSchema,
 });
 
 export const ReplayStopMessageSchema = z.object({
-  action: z.literal("replay:stop"),
+  action: z.literal("replayStop"),
 });
 
 export const ClientMessageSchema = z.discriminatedUnion("action", [

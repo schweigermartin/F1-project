@@ -118,7 +118,7 @@ describe("handleReplay", () => {
     expect(posted).toHaveLength(2);
   });
 
-  it("stops when aborted (replay:stop / disconnect / superseded)", async () => {
+  it("stops when aborted (replayStop / disconnect / superseded)", async () => {
     const { d, posted } = deps({ isAborted: vi.fn().mockResolvedValue(true) });
     const r = await handleReplay({ session_id: "11291", speed: 1 }, d);
     expect(r.outcome).toBe("aborted");

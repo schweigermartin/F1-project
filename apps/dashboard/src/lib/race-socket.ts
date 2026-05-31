@@ -125,8 +125,8 @@ export function createRaceSocket(deps: RaceSocketDeps): RaceSocket {
       void start();
     },
     send: (msg) => {
-      // Remember the latest subscribe/replay:start so a reconnect restores it.
-      if (msg.action === "subscribe" || msg.action === "replay:start") intent = msg;
+      // Remember the latest subscribe/replayStart so a reconnect restores it.
+      if (msg.action === "subscribe" || msg.action === "replayStart") intent = msg;
       if (open && ws) ws.send(JSON.stringify(msg));
     },
     close: () => {

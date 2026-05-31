@@ -272,7 +272,7 @@ export class RealtimeStack extends Stack {
     this.webSocketApi.grantManageConnections(this.fanoutFn);
 
     // ─── Replay λ (S3 JSONL → paced stream) ───────────────────────────────
-    // replay:start sets state + fires an async self-invoke; the playback runs
+    // replayStart sets state + fires an async self-invoke; the playback runs
     // in continuation invocations (not bound by the 29s WS integration
     // timeout), chaining via cursor until the session ends (R-3).
     const replayFnName = "F1-WS-Replay";
@@ -323,9 +323,12 @@ export class RealtimeStack extends Stack {
       }),
     );
 
+    // Route keys mirror the ClientMessage `action` values. They must be
+    // colon-free — API GW rejects `replay:start` ("route key is not formatted
+    // properly") — so they're camelCase, matching @f1/shared/ws-messages.
     const replayIntegration = new WebSocketLambdaIntegration("ReplayIntegration", this.replayFn);
-    this.webSocketApi.addRoute("replay:start", { integration: replayIntegration });
-    this.webSocketApi.addRoute("replay:stop", { integration: replayIntegration });
+    this.webSocketApi.addRoute("replayStart", { integration: replayIntegration });
+    this.webSocketApi.addRoute("replayStop", { integration: replayIntegration });
 
     // ─── Alarms + Dashboard (Constitution VIII) ───────────────────────────
     const alertAction = new cwActions.SnsAction(props.alertTopic);

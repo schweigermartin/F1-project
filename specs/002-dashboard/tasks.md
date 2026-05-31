@@ -1,7 +1,7 @@
 # Tasks: Live Dashboard
 
 > **Plan:** [plan.md](./plan.md)
-> **Status:** T1–T13 done, T14/T15 prepared (deploy pending), T16 partial, T17 done
+> **Status:** T1–T13 done, T14/T15 prepared (deploy pending), T16 partial, T17/T18 done
 
 Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Security → Frontend → Deploy/Demo. Backend-Pfade (Live + Replay) müssen stehen, bevor das Frontend etwas anzuzeigen hat.
 
@@ -157,3 +157,11 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
   - **Tech-Stack:** 4 Karten (Infra/CDK · Echtzeit+Frontend · ML · Qualität+Betrieb) mit Ein-Zeilen-Begründung je Wahl.
 - **Verify:** Geometrie-/Graph-Integrität + „genau die 6 echten Features" unit-getestet (`lib/architecture-geometry.test.ts`, 30 Dashboard-Tests grün); typecheck/eslint/prettier grün; `next build` erzeugt `/architecture` als statische Route.
 - **Notes:** Bewusst als Phase-2-Erweiterung geführt (Präsentations-Layer des Dashboards), kein eigener Stack. **Offen:** echte ML-Zahlen nach Phase-3-Publish einsetzen (`isModelPlaceholder = false`); Live-Link zur Seite ins README, sobald deployed (mit T16).
+
+### T18 — `/season` Saison-Seite (Standings · Kalender · Ergebnisse) — DONE
+
+- **Output (committet):** Eigene Route `apps/dashboard/src/app/season/`, Nav-Link „Saison →" im Dashboard-Header. Professionelle Saison-Übersicht: Fahrer- + Konstrukteurs-Weltrangliste, Next-Race-Hero mit Live-Countdown, voller Saisonkalender (vergangene gedimmt, nächstes hervorgehoben), letztes Renn-Ergebnis.
+  - **Daten:** Jolpica-F1-API (Ergast-kompatibel, frei, kein Key). Nur **server-seitig** geholt (Jolpica sendet kein CORS-Header) mit ISR `revalidate=3600` — gratis auf Vercel, schont das Rate-Limit, kein Key im Client.
+  - **Robustheit:** jede Antwort Zod-validiert (`lib/f1-api.ts`, Constitution VI); jeder Fehler (Netz/Non-200/Shape-Drift) → freundliche „nicht verfügbar"-Karte statt Build-/Route-Crash. `pickNextRace` pur + unit-getestet (`lib/f1-api.test.ts`).
+- **Verify:** typecheck/eslint/prettier grün; 35 Dashboard-Tests grün; `next build` erzeugt `/season` als ISR-Route (Revalidate 1h, prerendered).
+- **Notes:** Phase-2-Erweiterung (Präsentation), kein AWS-Stack, keine Laufkosten (Vercel-Hobby + freie API). **Offen:** Live-Link ins README mit dem T16-Deploy.

@@ -1,7 +1,7 @@
 # Tasks: Live Dashboard
 
 > **Plan:** [plan.md](./plan.md)
-> **Status:** T1–T13 done, T14/T15 prepared (deploy pending), T16 partial
+> **Status:** T1–T13 done, T14/T15 prepared (deploy pending), T16 partial, T17 done
 
 Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Security → Frontend → Deploy/Demo. Backend-Pfade (Live + Replay) müssen stehen, bevor das Frontend etwas anzuzeigen hat.
 
@@ -148,3 +148,12 @@ Reihenfolge bewusst: Verträge → Backend-Stack → Live-Pfad → Replay → Se
 - **Erledigt (committet):** README — Architektur-Diagramm (WS-API + Dashboard auf 🛠️ „Code da"), Phasen-Tabelle (`Live Dashboard → 🛠️ code da, Deploy ausstehend`), Stack-Zeile (Next.js+visx+Zustand). Spec-/Plan-Status auf „implemented (T1–T13), Deploy ausstehend".
 - **Offen (nach T14-Deploy):** Live-URL + Screenshot ins README, Diagramm/Tabelle auf ✅, Spec-/Plan-Status `done`, `git tag phase-2-done`.
 - **Verify:** Recruiter-Test (Constitution II/XII) an der Live-URL; Replay mit mindestens einer archivierten Session.
+
+### T17 — `/architecture` Showcase-Seite — DONE
+
+- **Output (committet):** Recruiter-facing Seite (Constitution XII), die das System mit Visualisierungen erklärt — eigene Route im Dashboard (`apps/dashboard/src/app/architecture/`), erreichbar über „Architektur →" im Header.
+  - **Interaktive, animierte Live-Pipeline:** SVG (OpenF1 → Poller → SQS → Consumer → DynamoDB/S3 → WebSocket → Dashboard), Daten-„Pakete" fließen via `animateMotion` über jede Kante; Hover/Tab auf einen Knoten hebt die Nachbarschaft hervor + erklärt sie. Datengetrieben aus `lib/architecture-data.ts`, Geometrie pur (`lib/architecture-geometry.ts`).
+  - **ML-Sektion:** 6 Pre-Race-Features nach SHAP-Wichtigkeit (visx) + Modell vs. Grid-Top-3-Baseline. Zahlen als illustrativ markiert (`isModelPlaceholder`) bis zum Phase-3-Publish — dann durch echte `model_card`-Werte ersetzen.
+  - **Tech-Stack:** 4 Karten (Infra/CDK · Echtzeit+Frontend · ML · Qualität+Betrieb) mit Ein-Zeilen-Begründung je Wahl.
+- **Verify:** Geometrie-/Graph-Integrität + „genau die 6 echten Features" unit-getestet (`lib/architecture-geometry.test.ts`, 30 Dashboard-Tests grün); typecheck/eslint/prettier grün; `next build` erzeugt `/architecture` als statische Route.
+- **Notes:** Bewusst als Phase-2-Erweiterung geführt (Präsentations-Layer des Dashboards), kein eigener Stack. **Offen:** echte ML-Zahlen nach Phase-3-Publish einsetzen (`isModelPlaceholder = false`); Live-Link zur Seite ins README, sobald deployed (mit T16).

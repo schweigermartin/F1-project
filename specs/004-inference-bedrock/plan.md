@@ -63,8 +63,8 @@ deployed wie das Dashboard in Phase 2).
   aus dem Phase-3-`ml/`-Paket — **kein** Nachbau der Feature-Logik. Identische
   Feature-Reihenfolge wie im Training, sonst stille Fehlvorhersage.
 - **Packaging (D1):** `lambda.DockerImageFunction` mit `public.ecr.aws/lambda/python:3.12`
-  + `xgboost`/`shap`/`pydantic`/`boto3` + das `f1pred`-Paket. Erster Python-Lambda
-  im Repo (bisher nur NodejsFunction) — Zip scheitert an den xgboost/shap-Wheels.
+  - `xgboost`/`shap`/`pydantic`/`boto3` + das `f1pred`-Paket. Erster Python-Lambda
+    im Repo (bisher nur NodejsFunction) — Zip scheitert an den xgboost/shap-Wheels.
 - **Failure-Mode:** Modell fehlt / Schema-Drift (Feature-Anzahl ≠ 6) → laut Fehler
   (Constitution VI), kein Default-Wert. Einzelner Fahrer ohne Quali-Daten → der
   Fahrer wird übersprungen + geloggt (R-4-Muster aus Phase 3), Rest läuft.
@@ -141,13 +141,13 @@ deployed wie das Dashboard in Phase 2).
 
 ## Kosten-Footprint (Constitution IV)
 
-| Posten              | Annahme                                          |        €/Jahr |
-| ------------------- | ------------------------------------------------ | ------------: |
-| Inference-Lambda    | 1× pro Rennen (~24/Jahr) × ~30 s, Docker-ARM64   |        ~ 0.20 |
-| Bedrock Claude Haiku| 24 Rennen × 20 Fahrer × ~300 Tokens, **gecacht** |    ~ 0.30–0.60 |
-| DDB F1Predictions   | on-demand, ~960 Writes/Jahr + Reads              |        ~ 0.02 |
-| ECR (Image-Storage) | 1 Image, < 1 GB                                  |        ~ 0.10 |
-| **Total**           |                                                  | **≈ 1 €/Jahr** |
+| Posten               | Annahme                                          |         €/Jahr |
+| -------------------- | ------------------------------------------------ | -------------: |
+| Inference-Lambda     | 1× pro Rennen (~24/Jahr) × ~30 s, Docker-ARM64   |         ~ 0.20 |
+| Bedrock Claude Haiku | 24 Rennen × 20 Fahrer × ~300 Tokens, **gecacht** |    ~ 0.30–0.60 |
+| DDB F1Predictions    | on-demand, ~960 Writes/Jahr + Reads              |         ~ 0.02 |
+| ECR (Image-Storage)  | 1 Image, < 1 GB                                  |         ~ 0.10 |
+| **Total**            |                                                  | **≈ 1 €/Jahr** |
 
 Steady State: Caching (AC-3) heißt, ein erneuter Page-Load kostet 0. Bedrock läuft
 nur einmal pro `(race, model_version)`.

@@ -42,7 +42,7 @@ in CI; Bedrock-Calls, Deploy und der reale Pre-Race-Lauf führt Martin aus (mark
 
 - **Output:** Versionierte Prompt-Templates (Spec R-2): System-Prompt
   („du erklärst, sagst nicht vorher" — AC-5), Funktion `buildExplanationPrompt(driver,
-  probability, shapTop)` → strukturierter User-Prompt, max. 3 Sätze gefordert (AC-2).
+probability, shapTop)` → strukturierter User-Prompt, max. 3 Sätze gefordert (AC-2).
   Prompt-Version als Konstante exportiert.
 - **Verify:** Snapshot-Tests gegen feste Inputs; keine PII/Secrets im Template.
 
@@ -58,7 +58,7 @@ in CI; Bedrock-Calls, Deploy und der reale Pre-Race-Lauf führt Martin aus (mark
 ### T5 — Feature-Aggregation für die Live-Vorhersage (`ml/src/f1pred/inference.py`)
 
 - **Output:** `build_race_features(race_date, round, *, load_quali, rounds_history)
-  -> pd.DataFrame` — baut die 6 Pre-Race-Features für ein kommendes Rennen aus
+-> pd.DataFrame` — baut die 6 Pre-Race-Features für ein kommendes Rennen aus
   beendetem Quali + rollierender Historie (injizierbare Loader wie `data.py` in
   Phase 3, damit offline testbar). Fahrer ohne Quali → übersprungen + geloggt (R-4).
 - **Verify:** `pytest` gegen injizierte Fake-Loader (kein FastF1/Netz); deckt
@@ -105,7 +105,7 @@ in CI; Bedrock-Calls, Deploy und der reale Pre-Race-Lauf führt Martin aus (mark
 
 - **Output:** schmale Lambda (`Query race#<date>#<round>`) → `PredictionApiResponseSchema`,
   hinter Function-URL oder API-GW. CORS nur erlaubte Origins (Predictor-Vercel-Domain
-  + localhost), kein `*` (Constitution VII). Kein direkter DDB/Bedrock-Zugriff aus dem Client.
+  - localhost), kein `*` (Constitution VII). Kein direkter DDB/Bedrock-Zugriff aus dem Client.
 - **Verify:** Handler-Unit-Test (moto-DDB); CDK-Test für CORS/IAM; `cdk synth` grün.
 
 ### T11 — Predictor-Frontend (`apps/predictor`)
@@ -133,7 +133,7 @@ in CI; Bedrock-Calls, Deploy und der reale Pre-Race-Lauf führt Martin aus (mark
 ### T14 — (Martin) Realer Pre-Race-Lauf + Abschluss
 
 - **Auszuführen:** vor mindestens einem realen Rennen Inference triggern → Predictions
-  + Bedrock-Erklärungen generieren; Stichprobe der Bedrock-Outputs qualitativ prüfen
-  (DoD); Caching verifizieren (zweiter Load = 0 Bedrock-Calls).
+  - Bedrock-Erklärungen generieren; Stichprobe der Bedrock-Outputs qualitativ prüfen
+    (DoD); Caching verifizieren (zweiter Load = 0 Bedrock-Calls).
 - **Verify:** Predictor zeigt Live-Vorhersagen vor dem Rennen; README + Architektur-
   Diagramm auf ✅ aktualisiert; `spec.md`/`plan.md`-Status → `done`; Tag `phase-4-done`.

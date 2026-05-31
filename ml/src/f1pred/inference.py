@@ -12,12 +12,15 @@ order is a silent mis-prediction, so a missing feature fails loudly here
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
 
+from f1pred.data import RACE_COLUMNS
 from f1pred.explain import one_prediction_shap
+from f1pred.features import build_features
 from f1pred.schema import FEATURE_NAMES, PodiumFeatures
 
 logger = logging.getLogger(__name__)
@@ -28,6 +31,26 @@ DEFAULT_TOP_N = 3
 #: Columns the inference frame must carry alongside the features to identify a
 #: driver — they become the DDB key + the frontend label, not model input.
 _IDENTITY_COLUMNS = ("driver_number", "driver_code")
+
+#: Columns a `LoadQuali` must return for the just-completed qualifying: driver
+#: identity + the three quali-derived passthrough features (the rolling features
+#: are computed from history, not supplied here).
+QUALI_COLUMNS = [
+    "driver_number",
+    "driver_code",
+    "driver",
+    "constructor",
+    "circuit",
+    "grid_position",
+    "quali_gap_to_pole_s",
+    "is_wet",
+]
+
+#: Shape `build_race_features` returns — exactly what `predict_podium` consumes.
+OUTPUT_COLUMNS = ["driver_number", "driver_code", *FEATURE_NAMES]
+
+#: (race_date, round) -> the upcoming race's per-driver quali frame, or None.
+LoadQuali = Callable[[str, int], "pd.DataFrame | None"]
 
 
 @dataclass(frozen=True)
@@ -118,3 +141,79 @@ def predict_podium(
 
     logger.info("predicted %d drivers (top_n=%d)", len(predictions), top_n)
     return predictions
+
+
+def build_race_features(
+    race_date: str,
+    round_number: int,
+    *,
+    load_quali: LoadQuali,
+    history: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build the six pre-race features for every driver of an upcoming race.
+
+    Three features come straight from the just-completed qualifying (via
+    `load_quali`): `grid_position`, `quali_gap_to_pole_s`, `is_wet`. The other
+    three are rolling/historical aggregates — so we append the target race (its
+    own result unknown) to `history` and run the *same* `build_features` as
+    training, which derives `driver_form`/`constructor_form`/`track_history`
+    from prior races only (the `.shift(1)` no-leakage guarantee). Reusing one
+    feature pipeline for train and inference is the point: no feature drift
+    (Constitution III).
+
+    `history` must hold the normalized `RACE_COLUMNS` of past races. Drivers
+    without a usable qualifying time are skipped + logged (R-4); drivers with no
+    prior history at all are dropped by `build_features` (no signal) and logged.
+    Returns `OUTPUT_COLUMNS`; an empty/absent quali yields an empty frame.
+    """
+    quali = load_quali(race_date, round_number)
+    if quali is None or quali.empty:
+        logger.warning("no qualifying data for %s round %s", race_date, round_number)
+        return pd.DataFrame(columns=OUTPUT_COLUMNS)
+
+    # R-4: a driver who didn't set a qualifying time has no grid/gap → skip + log.
+    incomplete = quali[quali["grid_position"].isna() | quali["quali_gap_to_pole_s"].isna()]
+    for _, r in incomplete.iterrows():
+        logger.warning(
+            "skipping driver %s: no qualifying time for %s round %s",
+            r.get("driver_code") or r.get("driver"),
+            race_date,
+            round_number,
+        )
+    quali = quali.drop(index=incomplete.index)
+    if quali.empty:
+        return pd.DataFrame(columns=OUTPUT_COLUMNS)
+
+    year = int(race_date[:4])
+    target = pd.DataFrame(
+        {
+            "year": year,
+            "round": round_number,
+            "driver": quali["driver"].astype(str),
+            "constructor": quali["constructor"].astype(str),
+            "circuit": quali["circuit"].astype(str),
+            "grid_position": quali["grid_position"],
+            "quali_gap_to_pole_s": quali["quali_gap_to_pole_s"],
+            "is_wet": quali["is_wet"],
+            # Inert placeholders: the target race is chronologically last, so
+            # build_features' .shift(1) never reads its own result. Real 0.0
+            # (not NaN) keeps the column dtype clean for the concat below.
+            "points": 0.0,
+            "finish_position": 0.0,
+        },
+        columns=RACE_COLUMNS,
+    )
+
+    combined = pd.concat([history.loc[:, RACE_COLUMNS], target], ignore_index=True)
+    feats = build_features(combined)
+    target_feats = feats[(feats["year"] == year) & (feats["round"] == round_number)]
+
+    # build_features carries only keys + features; re-attach driver identity.
+    identity = quali.loc[:, ["driver", "driver_number", "driver_code"]]
+    merged = target_feats.merge(identity, on="driver", how="left")
+
+    dropped = set(quali["driver"]) - set(target_feats["driver"])
+    for driver in sorted(dropped):
+        logger.warning("dropping driver %s: no prior history for %s", driver, race_date)
+
+    return merged.loc[:, OUTPUT_COLUMNS].reset_index(drop=True)

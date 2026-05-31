@@ -1,10 +1,20 @@
 """Inference core tests — synthetic model + features, no FastF1, no network."""
 
+import logging
+
+import numpy as np
 import pandas as pd
 import pytest
 from pydantic import ValidationError
 
-from f1pred.inference import DEFAULT_TOP_N, Prediction, predict_podium
+from f1pred.data import RACE_COLUMNS
+from f1pred.inference import (
+    DEFAULT_TOP_N,
+    OUTPUT_COLUMNS,
+    Prediction,
+    build_race_features,
+    predict_podium,
+)
 from f1pred.schema import FEATURE_NAMES
 from f1pred.train import train_podium
 
@@ -97,3 +107,107 @@ def test_out_of_range_feature_value_is_rejected(train_val: TrainVal) -> None:
     feats.loc[0, "grid_position"] = 0  # invalid: pole is 1 (PodiumFeatures ge=1)
     with pytest.raises(ValidationError):
         predict_podium(model, feats)
+
+
+# ─── build_race_features ─────────────────────────────────────────────────────
+
+
+def _history() -> pd.DataFrame:
+    """Five past rounds for VER + HAM on one circuit, so both have form + a
+    track record by the upcoming race."""
+    rows = []
+    for rnd in range(1, 6):
+        for driver, team, pts, fin in [("VER", "RB", 25.0, 1.0), ("HAM", "MER", 18.0, 2.0)]:
+            rows.append(
+                {
+                    "year": 2026,
+                    "round": rnd,
+                    "driver": driver,
+                    "constructor": team,
+                    "circuit": "Spielberg",
+                    "grid_position": 2,
+                    "quali_gap_to_pole_s": 0.2,
+                    "is_wet": False,
+                    "points": pts,
+                    "finish_position": fin,
+                }
+            )
+    return pd.DataFrame(rows, columns=RACE_COLUMNS)
+
+
+def _quali_frame() -> pd.DataFrame:
+    """Upcoming round 6 quali: two drivers with history, one rookie (no history),
+    one who set no time (NaN gap)."""
+    return pd.DataFrame(
+        {
+            "driver_number": [1, 44, 99, 2],
+            "driver_code": ["VER", "HAM", "ROO", "DNQ"],
+            "driver": ["VER", "HAM", "ROO", "DNQ"],
+            "constructor": ["RB", "MER", "RB", "MER"],
+            "circuit": ["Spielberg"] * 4,
+            "grid_position": [1, 3, 15, 20],
+            "quali_gap_to_pole_s": [0.0, 0.3, 1.1, np.nan],
+            "is_wet": [True, True, True, True],
+        }
+    )
+
+
+def test_build_race_features_returns_output_shape_for_drivers_with_history() -> None:
+    feats = build_race_features(
+        "2026-06-07", 6, load_quali=lambda _d, _r: _quali_frame(), history=_history()
+    )
+    assert list(feats.columns) == OUTPUT_COLUMNS
+    # VER + HAM survive; ROO (no history) and DNQ (no quali time) do not.
+    assert sorted(feats["driver_code"]) == ["HAM", "VER"]
+    assert set(feats["driver_number"]) == {1, 44}
+
+
+def test_build_race_features_passes_quali_values_through() -> None:
+    feats = build_race_features(
+        "2026-06-07", 6, load_quali=lambda _d, _r: _quali_frame(), history=_history()
+    )
+    ver = feats[feats["driver_code"] == "VER"].iloc[0]
+    assert ver["grid_position"] == 1
+    assert ver["quali_gap_to_pole_s"] == 0.0
+    assert bool(ver["is_wet"]) is True
+    # Rolling features come from history (VER scored 25 every prior round).
+    assert ver["driver_form"] == pytest.approx(25.0)
+
+
+def test_build_race_features_skips_driver_without_quali_time(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.WARNING):
+        feats = build_race_features(
+            "2026-06-07", 6, load_quali=lambda _d, _r: _quali_frame(), history=_history()
+        )
+    assert "DNQ" not in set(feats["driver_code"])
+    assert any(
+        "DNQ" in rec.message and "no qualifying time" in rec.message for rec in caplog.records
+    )
+
+
+def test_build_race_features_logs_driver_without_history(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING):
+        build_race_features(
+            "2026-06-07", 6, load_quali=lambda _d, _r: _quali_frame(), history=_history()
+        )
+    assert any("ROO" in rec.message and "no prior history" in rec.message for rec in caplog.records)
+
+
+def test_build_race_features_empty_quali_yields_empty_frame() -> None:
+    feats = build_race_features(
+        "2026-06-07", 6, load_quali=lambda _d, _r: None, history=_history()
+    )
+    assert feats.empty
+    assert list(feats.columns) == OUTPUT_COLUMNS
+
+
+def test_build_race_features_feeds_predict_podium(train_val: TrainVal) -> None:
+    model = _fit(train_val)
+    feats = build_race_features(
+        "2026-06-07", 6, load_quali=lambda _d, _r: _quali_frame(), history=_history()
+    )
+    preds = predict_podium(model, feats)
+    assert {p.driver_code for p in preds} == {"VER", "HAM"}
+    assert all(0.0 <= p.podium_probability <= 1.0 for p in preds)

@@ -14,7 +14,7 @@ Ein neuer Stack `RealtimeStack` (`F1-Realtime`) hängt an die in Phase 1 gebaute
 ┌──────────────────────────────────────────────┐
 │  API Gateway WebSocket API  (F1-Realtime)     │
 │  routes: $connect $disconnect subscribe       │
-│          replay:start replay:stop             │
+│          replayStart replayStop               │
 │  Lambda Request-Authorizer (Origin + Token)   │
 └───┬───────────┬──────────────┬────────────────┘
     │           │              │
@@ -43,7 +43,7 @@ Ein neuer Stack `RealtimeStack` (`F1-Realtime`) hängt an die in Phase 1 gebaute
 
 ### 1. WebSocket API (`RealtimeApi`)
 
-- **Verantwortung:** Einziger Ingress fürs Frontend. Routen: `$connect`, `$disconnect`, `subscribe`, `replay:start`, `replay:stop`.
+- **Verantwortung:** Einziger Ingress fürs Frontend. Routen: `$connect`, `$disconnect`, `subscribe`, `replayStart`, `replayStop` (Route-Keys sind colon-frei — API GW lehnt `replay:start` ab).
 - **Runtime/Trigger:** API Gateway v2 WebSocket, Lambda-Proxy-Integration pro Route.
 - **In/Out:** Client→Server `ClientMessage` (Zod, `@f1/shared`); Server→Client `ServerMessage` (Zod). Outbound via `ApiGatewayManagementApi.PostToConnection`.
 - **Failure-Mode:** `PostToConnection` → `410 Gone` = tote Connection → aus Connections-Table löschen. Message > 128 KB → Snapshot chunken (`snapshot:part` n/of).
@@ -76,8 +76,8 @@ Ein neuer Stack `RealtimeStack` (`F1-Realtime`) hängt an die in Phase 1 gebaute
 
 ### 6. Replay Lambda (`replay λ`)
 
-- **Verantwortung:** `replay:start {session_id, speed}` → liest `raw/sessions/<date>/<session>.jsonl` aus S3, spielt Zeilen nach `(fetched_at - t0)/speed` getaktet an **diese** Connection. Kann die 15-Min-Lambda-Wall überschreiten → **Self-Continuation**: pro Invocation wird ein Zeit-Chunk (Budget ~10 Min Wall) abgespielt, dann re-invoked sich die Lambda asynchron (`InvocationType: Event`) mit `{ connectionId, session_id, speed, cursor }`. `replay:stop` und Disconnect setzen ein Abbruch-Flag in der Connections-Table, das jeder Chunk vor dem nächsten Post prüft (R-3).
-- **In/Out:** `ClientMessage(replay:start)` + S3-Objekt → getaktete `ServerMessage(delta)` + finales `replay:end`.
+- **Verantwortung:** `replayStart {session_id, speed}` → liest `raw/sessions/<date>/<session>.jsonl` aus S3, spielt Zeilen nach `(fetched_at - t0)/speed` getaktet an **diese** Connection. Kann die 15-Min-Lambda-Wall überschreiten → **Self-Continuation**: pro Invocation wird ein Zeit-Chunk (Budget ~10 Min Wall) abgespielt, dann re-invoked sich die Lambda asynchron (`InvocationType: Event`) mit `{ connectionId, session_id, speed, cursor }`. `replayStop` und Disconnect setzen ein Abbruch-Flag in der Connections-Table, das jeder Chunk vor dem nächsten Post prüft (R-3).
+- **In/Out:** `ClientMessage(replayStart)` + S3-Objekt → getaktete `ServerMessage(delta)` + finales `replay:end`.
 - **Failure-Mode:** Datei fehlt → `error("session-not-archived")`. Connection weg (`410`) → Kette stoppt sofort. Cursor in der re-invoke-Payload, nicht in S3 → keine zusätzliche Persistenz.
 
 ### 7. Connections Table (`F1Connections`)
@@ -101,8 +101,8 @@ Zod-Schemas, von Infra-Lambdas **und** Frontend importiert.
 // Client → Server
 ClientMessage =
   | { action: "subscribe"; session_id?: string }
-  | { action: "replay:start"; session_id: string; speed: 1 | 2 | 4 }
-  | { action: "replay:stop" };
+  | { action: "replayStart"; session_id: string; speed: 1 | 2 | 4 }
+  | { action: "replayStop" };
 
 // Server → Client (Live + Replay identisch)
 ServerMessage =

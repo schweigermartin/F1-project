@@ -1,7 +1,7 @@
 # Spec: Inference + Bedrock
 
 > **Phase:** 004
-> **Status:** stub — vollständig ausarbeiten nach Phase 3 done
+> **Status:** planned — plan.md + tasks.md (draft) abgeleitet; offene Entscheidungen D2/D5 (siehe plan.md) vor Implementierung mit Martin klären
 > **Owner:** Martin
 
 ## Problem / Motivation

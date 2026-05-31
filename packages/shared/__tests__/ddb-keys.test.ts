@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   driverIntervalSK,
   driverPositionSK,
+  explanationSK,
   lapSK,
   LIVE_TTL_SECONDS,
   metaSK,
+  predictionSK,
+  racePK,
   sessionPK,
   skToEntity,
   stintSK,
@@ -71,5 +74,30 @@ describe("TTL helper", () => {
 
   it("LIVE_TTL_SECONDS is exactly 24 hours", () => {
     expect(LIVE_TTL_SECONDS).toBe(86400);
+  });
+});
+
+describe("F1Predictions key helpers (Phase 4)", () => {
+  it("race PK groups all rows of one race, round zero-padded to 2 digits", () => {
+    expect(racePK("2026-06-07", 9)).toBe("race#2026-06-07#09");
+    expect(racePK("2026-11-22", 22)).toBe("race#2026-11-22#22");
+  });
+
+  it("prediction SK zero-pads the driver number for sort stability", () => {
+    expect(predictionSK(1)).toBe("prediction#01");
+    expect(predictionSK(44)).toBe("prediction#44");
+  });
+
+  it("explanation SK mirrors the prediction SK per driver", () => {
+    expect(explanationSK(1)).toBe("explanation#01");
+    expect(explanationSK(44)).toBe("explanation#44");
+  });
+
+  it("a race Query returns explanations before predictions (lexical SK order)", () => {
+    expect(explanationSK(44) < predictionSK(44)).toBe(true);
+  });
+
+  it("padded SKs sort single- vs double-digit driver numbers correctly", () => {
+    expect(predictionSK(2) < predictionSK(10)).toBe(true);
   });
 });

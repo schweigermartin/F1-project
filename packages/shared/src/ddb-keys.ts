@@ -114,3 +114,32 @@ export function skToEntity(sk: string): string | null {
   if (sk.startsWith("weather#")) return "weather";
   return null;
 }
+
+/**
+ * Key helpers for the Phase-4 `F1Predictions` table — a *separate* table from
+ * F1Live (different lifecycle: one write per race, no 24h TTL, kept for the
+ * Phase-5 feedback loop). PK groups all of a race's rows so the Read-API can
+ * fetch them with one Query.
+ *
+ *   PK = race#<date>#<round>
+ *   SK = prediction#<driverNumber>  |  explanation#<driverNumber>
+ *
+ * Driver/round numbers are zero-padded for the same reason as lapSK/stintSK:
+ * range scans and any lexical comparison stay sorted (F1 numbers are 1–99,
+ * rounds 1–24, hence 2 digits).
+ */
+export const RACE_PK_PREFIX = "race" as const;
+
+export function racePK(date: string, round: number): string {
+  return `${RACE_PK_PREFIX}#${date}#${round.toString().padStart(2, "0")}`;
+}
+
+/** Per-driver model prediction (probability + SHAP) for a race. */
+export function predictionSK(driverNumber: number): string {
+  return `prediction#${driverNumber.toString().padStart(2, "0")}`;
+}
+
+/** Cached Bedrock explanation for a driver, alongside the prediction (AC-3). */
+export function explanationSK(driverNumber: number): string {
+  return `explanation#${driverNumber.toString().padStart(2, "0")}`;
+}

@@ -124,8 +124,8 @@ in CI; Bedrock-Calls, Deploy und der reale Pre-Race-Lauf führt Martin aus (mark
 
 ### T13 — (Martin) Bedrock-Access + Deploy
 
-- **Auszuführen (Konsole + Creds):** Bedrock-Model-Access für Claude Haiku im
-  Account aktivieren (Region laut D2 prüfen); `cdk deploy F1-Inference` (+ Read-API);
+- **Auszuführen (Konsole + Creds):** Bedrock-Model-Access für Claude Haiku in
+  `eu-central-1` aktivieren (bestätigt verfügbar); `cdk deploy F1-Inference` (+ Read-API);
   Predictor auf Vercel deployen (Root `apps/predictor`, Read-API-URL als Env).
 - **Verify:** Stacks `CREATE_COMPLETE`; Predictor-URL erreichbar; ein Test-Event
   erzeugt Predictions + (gecachte) Erklärungen in `F1Predictions`.

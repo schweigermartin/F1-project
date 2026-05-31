@@ -1,7 +1,7 @@
 # Plan: Inference + Bedrock
 
 > **Spec:** [spec.md](./spec.md)
-> **Status:** draft — abgeleitet aus spec.md, vor Implementierung von Martin zu reviewen
+> **Status:** ready — Entscheidungen (D2/D5/Feature-Quelle) mit Martin geklärt; Implementierung wartet auf das publishte Phase-3-Artefakt
 > **Phase:** 004
 
 Schließt Projekt 1 ab: das in Phase 3 trainierte, nach `models/<semver>/` publishte
@@ -114,7 +114,7 @@ deployed wie das Dashboard in Phase 2).
 
 - **Phase-3-Artefakt:** `S3_PATHS.modelArtifact(version)` = `models/<semver>/model.json`
   (XGBoost native JSON, via `booster.load_model`), `S3_PATHS.modelCard(version)`.
-- **Bedrock:** `bedrock-runtime:InvokeModel`, Claude Haiku 4.5. Region siehe D2.
+- **Bedrock:** `bedrock-runtime:InvokeModel`, Claude Haiku 4.5, Region `eu-central-1`.
 - **F1Live (Phase 1):** read-only, falls Live-Quali-Daten von dort statt FastF1
   gezogen werden (Alternative, siehe offene Entscheidung).
 - **Shared-Keys:** `bucketName(account, region)` + `S3_PATHS.*` aus `@f1/shared/s3-layout`;
@@ -164,18 +164,17 @@ nur einmal pro `(race, model_version)`.
 - **E2E (Playwright, Smoke):** Predictor-Seite lädt, zeigt Fahrer nach P sortiert,
   Klick öffnet die Begründung.
 
-## Offene Entscheidungen (vor Implementierung mit Martin klären)
+## Entscheidungen (mit Martin geklärt)
 
-- **D2 — Bedrock-Region (Spec R-1):** Claude Haiku in `eu-central-1` für den Account
-  verfügbar? Wenn ja → ein Stack, eine Region. Wenn nein → `bedrock-runtime`-Client
-  auf `us-east-1` (Cross-Region-Call), Rest bleibt `eu-central-1`. Braucht den
-  manuellen Bedrock-Model-Access (bereits Spec-Dependency).
-- **D5 — Inference-Trigger:** Pre-Race per EventBridge (T-60min, empfohlen,
-  konsistent mit Phase 1 Schedule-Sync) vs. on-demand bei Seitenaufruf. Empfehlung
-  Pre-Race wegen AC-1 (einmalige Berechnung) + AC-3 (Caching).
-- **Feature-Quelle für die Live-Vorhersage:** FastF1 (gerade beendetes Quali,
-  konsistent mit Training) vs. OpenF1/F1Live (Phase-1-Pipeline, aber Quali-Gap dort
-  nicht garantiert). Empfehlung FastF1 für Quali+History, identisch zum Training.
+- **D2 — Bedrock-Region:** **`eu-central-1`** — Claude Haiku ist für den Account dort
+  freigeschaltet (Spec R-1 aufgelöst). Ein Stack, eine Region; kein Cross-Region-Call,
+  Secrets/IAM bleiben in `eu-central-1`.
+- **D5 — Inference-Trigger:** **Pre-Race per EventBridge** (T-60min), konsistent mit
+  dem Schedule-Sync-Muster aus Phase 1. Erfüllt AC-1 (einmalige Berechnung) + AC-3
+  (Caching); kein On-Demand bei Seitenaufruf.
+- **Feature-Quelle:** **FastF1** für Quali (`grid_position`, `quali_gap_to_pole_s`) +
+  rollierende Historie (`driver_form`, `constructor_form`, `track_history`) — identisch
+  zum Training, damit keine Feature-Drift zwischen Train und Inference entsteht.
 
 ## Abweichungen von der Constitution
 

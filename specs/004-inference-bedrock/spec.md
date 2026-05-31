@@ -1,7 +1,7 @@
 # Spec: Inference + Bedrock
 
 > **Phase:** 004
-> **Status:** planned — plan.md + tasks.md (draft) abgeleitet; offene Entscheidungen D2/D5 (siehe plan.md) vor Implementierung mit Martin klären
+> **Status:** ready — plan.md + tasks.md abgeleitet, Entscheidungen geklärt; Implementierung wartet auf das publishte Phase-3-Artefakt
 > **Owner:** Martin
 
 ## Problem / Motivation

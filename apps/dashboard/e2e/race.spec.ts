@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test";
  * the same shell + that the replay controls work.
  */
 test("dashboard loads, shows data and connection status", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/live");
 
   await expect(page.getByRole("heading", { name: "F1 Live Dashboard" })).toBeVisible();
 
@@ -21,7 +21,7 @@ test("dashboard loads, shows data and connection status", async ({ page }) => {
 });
 
 test("replay controls are present and speed is selectable", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/live");
 
   await expect(page.getByLabel("session id")).toBeVisible();
   const fourX = page.getByRole("button", { name: "4×" });

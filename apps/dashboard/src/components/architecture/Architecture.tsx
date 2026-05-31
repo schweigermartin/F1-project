@@ -17,7 +17,7 @@ export function Architecture(): ReactNode {
     <main className={styles.page}>
       <header className={styles.hero}>
         <Link href="/" className={styles.back}>
-          ← Live-Dashboard
+          ← Start
         </Link>
         <h1 className={styles.title}>Wie das hier gebaut ist</h1>
         <p className={styles.lead}>

@@ -4,8 +4,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-  title: "F1 Live Dashboard",
-  description: "Live and replayed F1 telemetry — positions, gaps, tyres, weather.",
+  title: "F1 Portfolio",
+  description: "F1-Portfolio: Live-Telemetrie, ML-Podium-Predictor und Saison-Übersicht.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }): ReactNode {

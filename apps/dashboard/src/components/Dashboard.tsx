@@ -54,10 +54,10 @@ export function Dashboard(): ReactNode {
         <div style={{ display: "flex", alignItems: "baseline", gap: "1rem", flexWrap: "wrap" }}>
           <h1 style={{ color: "var(--accent)", margin: 0 }}>F1 Live Dashboard</h1>
           <Link
-            href="/season"
+            href="/"
             style={{ color: "var(--muted)", textDecoration: "none", fontSize: "0.85rem" }}
           >
-            Saison →
+            ← Start
           </Link>
           <Link
             href="/architecture"

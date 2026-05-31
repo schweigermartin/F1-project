@@ -33,9 +33,7 @@ class ModelCardMeta:
 
 
 def _metric_row(label: str, m: Metrics) -> str:
-    return (
-        f"| {label} | {m['accuracy']:.3f} | {m['log_loss']:.3f} | {m['roc_auc']:.3f} |"
-    )
+    return f"| {label} | {m['accuracy']:.3f} | {m['log_loss']:.3f} | {m['roc_auc']:.3f} |"
 
 
 def render_model_card(meta: ModelCardMeta) -> str:
@@ -84,13 +82,19 @@ def write_local(
     return out
 
 
-def upload_s3(version: str, model_path: Path, card_text: str, *, s3_client: Any, bucket: str) -> None:
+def upload_s3(
+    version: str, model_path: Path, card_text: str, *, s3_client: Any, bucket: str
+) -> None:
     """Put the model JSON + card to models/<version>/ in S3."""
     s3_client.put_object(
-        Bucket=bucket, Key=model_artifact_key(version), Body=model_path.read_bytes()
+        Bucket=bucket,
+        Key=model_artifact_key(version),
+        Body=model_path.read_bytes(),
     )
     s3_client.put_object(
-        Bucket=bucket, Key=model_card_key(version), Body=card_text.encode("utf-8")
+        Bucket=bucket,
+        Key=model_card_key(version),
+        Body=card_text.encode("utf-8"),
     )
 
 

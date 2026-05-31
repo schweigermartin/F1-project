@@ -71,10 +71,10 @@ Reihenfolge bewusst: Setup → Layout/Schema → Target/Split → Feature-Pipeli
 - **Verify:** 3 Tests — Card enthält Metriken/Features/Baseline; `publish` schreibt model.json + model_card.md lokal (tmp_path); **S3-Upload gegen `moto`** landet an `model_artifact_key`/`model_card_key`. ruff + mypy (11) + pytest (49) grün.
 - **Notes:** Card als Code-Template (statt `model_card_template.md`) — robuster/testbarer, kein File-IO-Risiko.
 
-### T11 — Notebook (`ml/notebooks/train_podium_model.ipynb`)
+### T11 — Notebook (`ml/notebooks/train_podium_model.ipynb`) + Orchestrator (`ml/src/f1pred/pipeline.py`)
 
-- **Output:** orchestriert Data→Features→Split→Train→Eval→SHAP→Artefakt sichtbar; Metriken + Baseline + Plots prominent (US-1/DoD). Dünn — Logik in den Modulen.
-- **Verify:** Notebook läuft top-to-bottom durch (Martin, mit FastF1-Cache); Outputs committed.
+- **Output:** Die End-to-End-Verdrahtung (Data→Features→Split→Train→Eval→SHAP→Card) lebt in `pipeline.py` (`run_pipeline`), damit sie offline gegen synthetische Saisons unit-getestet ist (`tests/test_pipeline.py`). Das Notebook ist ein dünner Caller: lädt FastF1-Saisons, ruft `run_pipeline`, zeigt Metriken + Baseline + Plots + SHAP prominent (US-1/DoD), publisht das Artefakt.
+- **Verify:** `pipeline.py` + `test_pipeline.py` grün in CI (offline, deterministisch). Notebook läuft top-to-bottom durch (Martin, mit FastF1-Cache → T12); Outputs committed.
 
 ### T12 — (Martin) Realer Trainingslauf + S3-Upload
 

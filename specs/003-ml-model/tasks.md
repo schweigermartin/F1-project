@@ -55,10 +55,10 @@ Reihenfolge bewusst: Setup → Layout/Schema → Target/Split → Feature-Pipeli
 - **Output:** `train_podium(x_train, y_train, x_val, y_val, *, params, early_stopping_rounds=30)` → `XGBClassifier`. `RANDOM_STATE=42`, `n_jobs=1`, `tree_method="hist"` → deterministisch (AC-8). `scale_pos_weight(y) = neg/pos` (AC-4). Dokumentiertes Default-HP-Set, Early-Stopping auf Val, Features in kanonischer Reihenfolge + `astype(float)` (is_wet→0/1). pyproject `xgboost~=3.0` (auf getestete Major nachgezogen).
 - **Verify:** 4 Tests (scale_pos_weight neg/pos + no-positives; trainiert + predict_proba-Shape; **gleicher Seed → identische proba**, AC-8) auf synthetischen Fixtures (`conftest.py`). ruff + mypy (8) + pytest (29) grün (lokal mit `brew install libomp`).
 
-### T8 — Evaluation + Baseline (`evaluate.py`)
+### T8 — Evaluation + Baseline (`evaluate.py`) — DONE
 
-- **Output:** `evaluate(model, X_test, y_test)` → Accuracy/Log-Loss/ROC-AUC/Konfusionsmatrix + Kalibrierung; `baseline_grid_top3(...)` für denselben Vergleich. Plot-Helfer (Matplotlib).
-- **Verify:** Test: Metrik-Dict-Shape auf synthetischem Set, Baseline deterministisch berechnet.
+- **Output:** `evaluate(model, x_test, y_test)` → `Metrics` (TypedDict: accuracy, log_loss, roc_auc, confusion_matrix); `baseline_grid_top3(...)` mit denselben Metriken (AC-5, Vergleich Modell vs. „Podium = Grid ≤ 3"). `confusion_figure`/`calibration_figure` über die OO-Matplotlib-API (kein pyplot/Display). AUC→NaN bei nur einer Klasse.
+- **Verify:** 3 Tests (alle Metriken in Range; Baseline finite; beide Figures bauen ohne Display) auf trainiertem Synthetik-Modell. ruff + mypy (9) + pytest (32) grün.
 
 ### T9 — SHAP (`explain.py`)
 

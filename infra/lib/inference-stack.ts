@@ -2,19 +2,30 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { PK_ATTR, SK_ATTR } from "@f1/shared";
-import { Duration, RemovalPolicy, Size, Stack, type StackProps, Tags } from "aws-cdk-lib";
+import {
+  CfnOutput,
+  Duration,
+  RemovalPolicy,
+  Size,
+  Stack,
+  type StackProps,
+  Tags,
+} from "aws-cdk-lib";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as cwActions from "aws-cdk-lib/aws-cloudwatch-actions";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
+import * as logs from "aws-cdk-lib/aws-logs";
 import { type IBucket } from "aws-cdk-lib/aws-s3";
 import { type ITopic } from "aws-cdk-lib/aws-sns";
 import { type Construct } from "constructs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..", "..");
+const lambdaDir = (sub: string): string => path.resolve(__dirname, "..", "lambda", sub);
 
 /**
  * Claude Haiku 4.5 on Bedrock in eu-central-1 (Spec Q-1 / D2). EU inference
@@ -38,6 +49,9 @@ export interface InferenceStackProps extends StackProps {
   readonly dataBucket: IBucket;
   /** Shared SNS alert topic from PipelineStack — all phases alert here (T9). */
   readonly alertTopic: ITopic;
+  /** CORS origin allowlist for the Read-API Function URL (predictor Vercel
+   * domain + localhost). Never `*` (Constitution VII). Defaults to localhost. */
+  readonly allowedOrigins?: string[];
 }
 
 /**
@@ -52,12 +66,14 @@ export interface InferenceStackProps extends StackProps {
  *
  *   T8  ✓ — table + Docker inference λ + IAM + scheduler-invoke role
  *   T9  ✓ — alarms (errors / bedrock-error-rate / silence) + dashboard
- *   T10 — read-API (separate construct/stack)
+ *   T10 ✓ — read-API λ (Function URL, CORS-scoped, Query-only) for the frontend
  */
 export class InferenceStack extends Stack {
   readonly predictionsTable: dynamodb.TableV2;
   readonly inferenceFn: lambda.DockerImageFunction;
   readonly schedulerInvokeRole: iam.Role;
+  readonly readApiFn: lambda.Function;
+  readonly readApiUrl: lambda.FunctionUrl;
 
   constructor(scope: Construct, id: string, props: InferenceStackProps) {
     super(scope, id, props);
@@ -187,8 +203,63 @@ export class InferenceStack extends Stack {
       },
     });
 
+    // ─── Read-API (the frontend's only path to the predictions) ───────────
+    const { fn, url } = this.addReadApi(props.allowedOrigins);
+    this.readApiFn = fn;
+    this.readApiUrl = url;
+
     // ─── Alarms + dashboard (Constitution VIII) ───────────────────────────
     this.addMonitoring(props.alertTopic);
+  }
+
+  /**
+   * Slim Node λ behind a Function URL: the predictor frontend (T11) fetches a
+   * race's predictions here — never DDB/Bedrock directly (plan § security). It
+   * holds only `dynamodb:Query` on F1Predictions (Constitution VII). CORS is
+   * locked to the predictor origins (no `*`); the URL is unauthenticated
+   * because the data is public race predictions, but the allowlist still keeps
+   * other sites' browsers off it.
+   */
+  private addReadApi(allowedOrigins?: string[]): {
+    fn: lambda.Function;
+    url: lambda.FunctionUrl;
+  } {
+    const fn = new NodejsFunction(this, "PredictionsApiFn", {
+      functionName: "F1-Predictions-Api",
+      entry: path.join(lambdaDir("predictions-api"), "index.ts"),
+      handler: "handler",
+      runtime: lambda.Runtime.NODEJS_20_X,
+      architecture: lambda.Architecture.ARM_64,
+      logRetention: logs.RetentionDays.TWO_WEEKS,
+      memorySize: 256,
+      timeout: Duration.seconds(10),
+      bundling: {
+        format: OutputFormat.ESM,
+        target: "node20",
+        externalModules: ["@aws-sdk/*"],
+      },
+      environment: { PREDICTIONS_TABLE: this.predictionsTable.tableName },
+    });
+
+    fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:Query"],
+        resources: [this.predictionsTable.tableArn],
+      }),
+    );
+
+    const url = fn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowedOrigins: allowedOrigins ?? ["http://localhost:3000"],
+        allowedMethods: [lambda.HttpMethod.GET],
+        allowedHeaders: ["content-type"],
+        maxAge: Duration.hours(1),
+      },
+    });
+    new CfnOutput(this, "PredictionsApiUrl", { value: url.url });
+
+    return { fn, url };
   }
 
   /** One custom EMF metric emitted by the inference λ (namespace F1/Inference).
@@ -235,7 +306,25 @@ export class InferenceStack extends Stack {
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     }).addAlarmAction(alertAction);
 
-    // 3. Silence — the λ fired but produced zero drivers (e.g. no quali data).
+    // 3. Read-API error rate — the frontend's only data path; >5% errored
+    // invocations over 5 min means the predictor page is broken.
+    new cloudwatch.Alarm(this, "ReadApiErrorRateAlarm", {
+      alarmName: "F1-Predictions-Api-ErrorRate",
+      metric: new cloudwatch.MathExpression({
+        expression: "errors / IF(invocations > 0, invocations, 1) * 100",
+        usingMetrics: {
+          errors: this.readApiFn.metricErrors({ period: Duration.minutes(5) }),
+          invocations: this.readApiFn.metricInvocations({ period: Duration.minutes(5) }),
+        },
+        period: Duration.minutes(5),
+      }),
+      threshold: 5,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
+    // 4. Silence — the λ fired but produced zero drivers (e.g. no quali data).
     // The handler emits InferenceDrivers=0 in that case, so an alarm on
     // "metric present AND ≤ 0" distinguishes "ran but empty" from "never ran".
     new cloudwatch.Alarm(this, "InferenceSilenceAlarm", {

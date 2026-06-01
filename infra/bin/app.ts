@@ -44,6 +44,9 @@ new InferenceStack(app, "F1-Inference", {
     "Race outcome predictor (T-60min inference λ → XGBoost + Bedrock explanations → F1Predictions).",
   dataBucket: dataLayer.dataBucket,
   alertTopic: pipeline.alertTopic,
+  // Read-API CORS allowlist (Constitution VII, no `*`). localhost for dev; the
+  // predictor Vercel domain is added when the frontend ships (T11/T13).
+  allowedOrigins: ["http://localhost:3000"],
 });
 
 // Constitution Artikel III: every resource gets these tags so we can audit

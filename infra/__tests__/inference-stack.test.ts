@@ -24,6 +24,7 @@ function synth(): Template {
   const stack = new InferenceStack(app, "TestInference", {
     dataBucket: deps.bucket,
     alertTopic: deps.topic,
+    allowedOrigins: ["https://predictor.example.com", "http://localhost:3000"],
   });
   return Template.fromStack(stack);
 }
@@ -160,6 +161,48 @@ describe("InferenceStack — alarms + dashboard (Constitution VIII)", () => {
   it("publishes the f1-inference dashboard", () => {
     synth().hasResourceProperties("AWS::CloudWatch::Dashboard", {
       DashboardName: "f1-inference",
+    });
+  });
+
+  it("alarms on the read-API error rate (the frontend's only data path)", () => {
+    synth().hasResourceProperties("AWS::CloudWatch::Alarm", {
+      AlarmName: "F1-Predictions-Api-ErrorRate",
+      ComparisonOperator: "GreaterThanThreshold",
+    });
+  });
+});
+
+describe("InferenceStack — read-API", () => {
+  it("exposes a Function URL with CORS scoped to the allowed origins, never '*'", () => {
+    synth().hasResourceProperties("AWS::Lambda::Url", {
+      AuthType: "NONE",
+      Cors: {
+        AllowOrigins: ["https://predictor.example.com", "http://localhost:3000"],
+        AllowMethods: ["GET"],
+      },
+    });
+  });
+
+  it("does not allow a wildcard CORS origin", () => {
+    const urls = synth().findResources("AWS::Lambda::Url");
+    for (const url of Object.values(urls)) {
+      const origins = url.Properties?.Cors?.AllowOrigins ?? [];
+      expect(origins).not.toContain("*");
+    }
+  });
+
+  it("grants the read-API only dynamodb:Query on the predictions table", () => {
+    synth().hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: {
+        Statement: Match.arrayWith([Match.objectLike({ Action: "dynamodb:Query" })]),
+      },
+    });
+  });
+
+  it("names the read-API lambda F1-Predictions-Api with the table in its env", () => {
+    synth().hasResourceProperties("AWS::Lambda::Function", {
+      FunctionName: "F1-Predictions-Api",
+      Environment: { Variables: Match.objectLike({ PREDICTIONS_TABLE: Match.anyValue() }) },
     });
   });
 });

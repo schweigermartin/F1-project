@@ -122,3 +122,44 @@ describe("InferenceStack — trigger pathway", () => {
     });
   });
 });
+
+describe("InferenceStack — alarms + dashboard (Constitution VIII)", () => {
+  it("alarms on any inference lambda error → the SNS alert topic", () => {
+    const template = synth();
+    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+      AlarmName: "F1-Inference-Errors",
+      MetricName: "Errors",
+      Namespace: "AWS/Lambda",
+      ComparisonOperator: "GreaterThanThreshold",
+      Threshold: 0,
+      AlarmActions: Match.anyValue(),
+    });
+  });
+
+  it("alarms on a high Bedrock error rate (best-effort explanations)", () => {
+    synth().hasResourceProperties("AWS::CloudWatch::Alarm", {
+      AlarmName: "F1-Inference-BedrockErrorRate",
+      ComparisonOperator: "GreaterThanThreshold",
+      Metrics: Match.arrayWith([
+        Match.objectLike({ MetricStat: Match.objectLike({ Metric: Match.anyValue() }) }),
+      ]),
+    });
+  });
+
+  it("has a silence alarm — fired but produced zero drivers", () => {
+    synth().hasResourceProperties("AWS::CloudWatch::Alarm", {
+      AlarmName: "F1-Inference-NoPredictions",
+      MetricName: "InferenceDrivers",
+      Namespace: "F1/Inference",
+      ComparisonOperator: "LessThanOrEqualToThreshold",
+      Threshold: 0,
+      TreatMissingData: "notBreaching",
+    });
+  });
+
+  it("publishes the f1-inference dashboard", () => {
+    synth().hasResourceProperties("AWS::CloudWatch::Dashboard", {
+      DashboardName: "f1-inference",
+    });
+  });
+});

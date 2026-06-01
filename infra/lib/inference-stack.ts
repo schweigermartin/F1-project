@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 
 import { PK_ATTR, SK_ATTR } from "@f1/shared";
 import { Duration, RemovalPolicy, Size, Stack, type StackProps, Tags } from "aws-cdk-lib";
+import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
+import * as cwActions from "aws-cdk-lib/aws-cloudwatch-actions";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import * as iam from "aws-cdk-lib/aws-iam";
@@ -21,6 +23,10 @@ const repoRoot = path.resolve(__dirname, "..", "..");
  */
 const BEDROCK_MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0";
 const CLAUDE_HAIKU_FM_PATTERN = "anthropic.claude-haiku-4-5-*";
+
+/** EMF namespace the inference λ writes its custom metrics under. Mirrors
+ * `_METRIC_NAMESPACE` in infra/lambda/inference/lambda_function.py — keep in sync. */
+const METRIC_NAMESPACE = "F1/Inference";
 
 /** Known names so PipelineStack's schedule-sync can build the ARNs without a
  * cross-stack reference (which would create a Pipeline↔Inference cycle). */
@@ -45,7 +51,7 @@ export interface InferenceStackProps extends StackProps {
  * expire. The model artifact is read cross-stack from the shared data bucket.
  *
  *   T8  ✓ — table + Docker inference λ + IAM + scheduler-invoke role
- *   T9  — alarms + dashboard
+ *   T9  ✓ — alarms (errors / bedrock-error-rate / silence) + dashboard
  *   T10 — read-API (separate construct/stack)
  */
 export class InferenceStack extends Stack {
@@ -179,6 +185,101 @@ export class InferenceStack extends Stack {
           ],
         }),
       },
+    });
+
+    // ─── Alarms + dashboard (Constitution VIII) ───────────────────────────
+    this.addMonitoring(props.alertTopic);
+  }
+
+  /** One custom EMF metric emitted by the inference λ (namespace F1/Inference).
+   * The λ runs ~24×/year, so default everything to Sum over a long-ish period;
+   * `treatMissingData: NOT_BREACHING` keeps the off-season silence from paging. */
+  private inferenceMetric(metricName: string, statistic = "Sum"): cloudwatch.Metric {
+    return new cloudwatch.Metric({
+      namespace: METRIC_NAMESPACE,
+      metricName,
+      statistic,
+      period: Duration.minutes(5),
+    });
+  }
+
+  private addMonitoring(alertTopic: ITopic): void {
+    const alertAction = new cwActions.SnsAction(alertTopic);
+
+    // 1. Inference errors — any failed invocation is a missed race prediction.
+    new cloudwatch.Alarm(this, "InferenceErrorsAlarm", {
+      alarmName: "F1-Inference-Errors",
+      metric: this.inferenceFn.metricErrors({ period: Duration.minutes(15) }),
+      threshold: 0,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
+    // 2. Bedrock error rate — explanations are best-effort (never block a
+    // prediction), but a high failure share means the whole grid ran without
+    // narratives. Rate over attempts (calls + errors), guarded against /0.
+    new cloudwatch.Alarm(this, "BedrockErrorRateAlarm", {
+      alarmName: "F1-Inference-BedrockErrorRate",
+      metric: new cloudwatch.MathExpression({
+        expression: "errors / IF(errors + calls > 0, errors + calls, 1) * 100",
+        usingMetrics: {
+          errors: this.inferenceMetric("BedrockErrors"),
+          calls: this.inferenceMetric("BedrockCalls"),
+        },
+        period: Duration.minutes(15),
+      }),
+      threshold: 50,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
+    // 3. Silence — the λ fired but produced zero drivers (e.g. no quali data).
+    // The handler emits InferenceDrivers=0 in that case, so an alarm on
+    // "metric present AND ≤ 0" distinguishes "ran but empty" from "never ran".
+    new cloudwatch.Alarm(this, "InferenceSilenceAlarm", {
+      alarmName: "F1-Inference-NoPredictions",
+      metric: this.inferenceMetric("InferenceDrivers", "Maximum"),
+      threshold: 0,
+      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
+    new cloudwatch.Dashboard(this, "InferenceDashboard", {
+      dashboardName: "f1-inference",
+      widgets: [
+        [
+          new cloudwatch.GraphWidget({
+            title: "Inference invocations vs errors",
+            left: [this.inferenceFn.metricInvocations()],
+            right: [this.inferenceFn.metricErrors({ color: cloudwatch.Color.RED })],
+            width: 12,
+          }),
+          new cloudwatch.GraphWidget({
+            title: "Drivers predicted per run",
+            left: [this.inferenceMetric("InferenceDrivers", "Maximum")],
+            width: 12,
+          }),
+        ],
+        [
+          new cloudwatch.GraphWidget({
+            title: "Bedrock calls vs cache hits vs errors",
+            left: [
+              this.inferenceMetric("BedrockCalls"),
+              this.inferenceMetric("BedrockCacheHits", "Maximum"),
+              this.inferenceMetric("BedrockErrors").with({ color: cloudwatch.Color.RED }),
+            ],
+            width: 12,
+          }),
+          new cloudwatch.GraphWidget({
+            title: "Inference duration",
+            left: [this.inferenceFn.metricDuration({ statistic: "Maximum" })],
+            width: 12,
+          }),
+        ],
+      ],
     });
   }
 }

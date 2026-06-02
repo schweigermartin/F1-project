@@ -33,6 +33,10 @@ export const S3_PATHS = {
 
   /** Human-readable model card alongside the artifact (Constitution IX). */
   modelCard: (version: string): string => `models/${version}/model_card.md`,
+
+  /** Precomputed historical race frame bundled with the model, read by the
+   * inference lambda for rolling features (so it never re-fetches FastF1). */
+  modelHistory: (version: string): string => `models/${version}/history.csv`,
 } as const;
 
 export type S3PathBuilders = typeof S3_PATHS;

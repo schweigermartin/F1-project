@@ -41,6 +41,11 @@ class FakeDeps:
         self.metrics: list[tuple[str, float]] = []
         self.bedrock_calls = 0
         self.bedrock_should_raise = False
+        self.load_features_args: tuple[str, int, str] | None = None
+
+    def _load_features(self, race_date: str, round_number: int, version: str) -> pd.DataFrame:
+        self.load_features_args = (race_date, round_number, version)
+        return self._features
 
     def _invoke_bedrock(self, system: str, user: str) -> str:
         self.bedrock_calls += 1
@@ -51,7 +56,7 @@ class FakeDeps:
     def build(self) -> InferenceDeps:
         return InferenceDeps(
             load_model=lambda _v: self._model,
-            load_features=lambda _d, _r: self._features,
+            load_features=self._load_features,
             put_prediction=self.predictions.append,
             get_cached_explanation=lambda key: self.cache.get(key),
             invoke_bedrock=self._invoke_bedrock,
@@ -95,6 +100,13 @@ def test_prediction_record_carries_race_context_and_model_version(deps: FakeDeps
     assert rec.model_version == "0.1.0"
     assert rec.predicted_at == FIXED_NOW.isoformat()
     assert rec.prediction.driver_number == 1
+
+
+def test_load_features_receives_event_race_and_model_version(deps: FakeDeps) -> None:
+    handle_inference(EVENT, deps.build())
+    # version is passed so the adapter loads the history artifact bundled with
+    # the model (models/<version>/history.csv).
+    assert deps.load_features_args == ("2026-06-07", 9, "0.1.0")
 
 
 def test_cache_hit_skips_bedrock_entirely(deps: FakeDeps) -> None:

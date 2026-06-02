@@ -21,3 +21,10 @@ def model_artifact_key(version: str) -> str:
 def model_card_key(version: str) -> str:
     """S3 key for the human-readable model card alongside the artifact."""
     return f"models/{version}/model_card.md"
+
+
+def model_history_key(version: str) -> str:
+    """S3 key for the precomputed historical race frame bundled with the model.
+    The inference lambda reads this for rolling features instead of re-fetching
+    FastF1 (which trips Ergast's 500-calls/h limit on a cold cache)."""
+    return f"models/{version}/history.csv"

@@ -8,7 +8,7 @@ Env:
   PREDICTIONS_TABLE   F1Predictions DynamoDB table name
   MODEL_BUCKET        S3 bucket holding models/<version>/model.json
   BEDROCK_MODEL_ID    Claude Haiku model/inference-profile id (eu-central-1)
-  HISTORY_YEARS       comma-separated seasons to aggregate for rolling features
+  FASTF1_CACHE_DIR    writable FastF1 cache dir (/tmp on Lambda's read-only fs)
 """
 
 import json
@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import boto3
+import pandas as pd
 from xgboost import XGBClassifier
 
 from f1pred.aws_io import (
@@ -26,7 +27,7 @@ from f1pred.aws_io import (
     parse_bedrock_text,
     prediction_item,
 )
-from f1pred.data import fastf1_load_race, fastf1_rounds_for_year, load_seasons
+from f1pred.data import RACE_COLUMNS
 from f1pred.ddb_keys import explanation_sk, race_pk
 from f1pred.inference import build_race_features, fastf1_load_quali
 from f1pred.inference_handler import (
@@ -36,7 +37,7 @@ from f1pred.inference_handler import (
     PredictionRecord,
     handle_inference,
 )
-from f1pred.layout import model_artifact_key
+from f1pred.layout import model_artifact_key, model_history_key
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("inference")
@@ -44,7 +45,6 @@ logger = logging.getLogger("inference")
 _TABLE_NAME = os.environ["PREDICTIONS_TABLE"]
 _MODEL_BUCKET = os.environ["MODEL_BUCKET"]
 _BEDROCK_MODEL_ID = os.environ["BEDROCK_MODEL_ID"]
-_HISTORY_YEARS = [int(y) for y in os.environ.get("HISTORY_YEARS", "").split(",") if y.strip()]
 
 _s3 = boto3.client("s3")
 _table = boto3.resource("dynamodb").Table(_TABLE_NAME)
@@ -68,11 +68,13 @@ def _load_model(version: str) -> XGBClassifier:
     return _model_cache[version]
 
 
-def _load_features(race_date: str, round_number: int) -> Any:
-    years = _HISTORY_YEARS or [int(race_date[:4]) - 1, int(race_date[:4])]
-    history = load_seasons(
-        years, rounds_for_year=fastf1_rounds_for_year, load_race=fastf1_load_race
-    )
+def _load_features(race_date: str, round_number: int, version: str) -> Any:
+    # Rolling features come from the precomputed history bundled with the model
+    # (models/<version>/history.csv); only the upcoming quali is fetched live, so
+    # FastF1's 500-calls/h limit is never hit on a cold /tmp cache.
+    path = f"/tmp/history-{version}.csv"  # noqa: S108 — Lambda's only writable dir
+    _s3.download_file(_MODEL_BUCKET, model_history_key(version), path)
+    history = pd.read_csv(path)[RACE_COLUMNS]
     return build_race_features(
         race_date, round_number, load_quali=fastf1_load_quali, history=history
     )

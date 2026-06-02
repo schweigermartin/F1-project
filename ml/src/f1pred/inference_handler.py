@@ -75,7 +75,9 @@ class InferenceDeps:
     """Injected boundary — real implementations wired by the adapter (T7)."""
 
     load_model: Callable[[str], Any]  # model_version -> fitted model
-    load_features: Callable[[str, int], pd.DataFrame]  # (race_date, round) -> features
+    # (race_date, round, model_version) -> features; version selects the history
+    # artifact bundled with the model.
+    load_features: Callable[[str, int, str], pd.DataFrame]
     put_prediction: Callable[[PredictionRecord], None]
     get_cached_explanation: Callable[[ExplanationKey], str | None]
     invoke_bedrock: Callable[[str, str], str]  # (system, user) -> explanation text
@@ -106,7 +108,7 @@ def handle_inference(event: dict[str, Any], deps: InferenceDeps) -> InferenceSum
     log = deps.logger
 
     model = deps.load_model(ev.model_version)
-    features = deps.load_features(ev.race_date, ev.round)
+    features = deps.load_features(ev.race_date, ev.round, ev.model_version)
     predictions = predict_podium(model, features)
     deps.emit_metric("InferenceDrivers", float(len(predictions)))
 

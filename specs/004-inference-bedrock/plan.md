@@ -1,7 +1,7 @@
 # Plan: Inference + Bedrock
 
 > **Spec:** [spec.md](./spec.md)
-> **Status:** ready — Entscheidungen (D2/D5/Feature-Quelle) mit Martin geklärt; Implementierung wartet auf das publishte Phase-3-Artefakt
+> **Status:** done — implementiert + deployed (eu-central-1), end-to-end verifiziert. T14 echter Pre-Race-Auto-Lauf @ Monaco 2026-06-07.
 > **Phase:** 004
 
 Schließt Projekt 1 ab: das in Phase 3 trainierte, nach `models/<semver>/` publishte

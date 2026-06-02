@@ -1,7 +1,11 @@
 # Tasks: Inference + Bedrock
 
 > **Plan:** [plan.md](./plan.md)
-> **Status:** draft
+> **Status:** T1–T13 done (deployed + verified). T14 pre-race auto-run pending
+> Monaco 2026-06-07. The T14 smoke run surfaced + fixed three deploy bugs:
+> read-only FastF1 cache (→ `FASTF1_CACHE_DIR=/tmp`), live FastF1 history reload
+> tripping Ergast's 500-calls/h limit (→ load `models/<version>/history.csv` from
+> S3, only quali is fetched live), and `load_features` missing `model_version`.
 
 Reihenfolge bewusst: geteilte Verträge zuerst → pure Inference-Logik (offline +
 in CI testbar) → Infra (Docker-Lambda, Tabelle, Trigger, Alarme) → Read-API →

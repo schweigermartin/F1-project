@@ -1,7 +1,7 @@
 # Spec: Inference + Bedrock
 
 > **Phase:** 004
-> **Status:** ready — plan.md + tasks.md abgeleitet, Entscheidungen geklärt; Implementierung wartet auf das publishte Phase-3-Artefakt
+> **Status:** done — T1–T13 implementiert + deployed (eu-central-1), end-to-end verifiziert (Miami-Smoke-Lauf: 19 Predictions + Bedrock-Erklärungen + Caching). T14 echter Pre-Race-Auto-Lauf @ Monaco 2026-06-07.
 > **Owner:** Martin
 
 ## Problem / Motivation

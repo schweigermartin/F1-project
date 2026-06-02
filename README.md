@@ -58,30 +58,31 @@ Zwei zusammenhängende Systeme, die eine gemeinsame Datenpipeline teilen:
                            │ (Feedback Loop, Phase 5)          │
                            │                                   ▼
                            │                            ┌──────────────┐
-                           └──────────────────────────▶ │  Inference   │ 📋 (Phase 4)
-                                                        │  Lambda      │
-                                                        │  + Bedrock   │
+                           └──────────────────────────▶ │  Inference   │ ✅ F1-Inference
+                                                        │  Lambda      │     (Docker, Python)
+                                                        │  + Bedrock   │     Claude Haiku 4.5
                                                         │  (Claude)    │
                                                         └──────┬───────┘
                                                                │
                                                                ▼
                                                         ┌──────────────┐
-                                                        │ apps/pred.   │ 📋 (Phase 4)
-                                                        │ Next.js,     │
-                                                        │ Bars + LLM   │
+                                                        │ apps/pred.   │ ✅ Vercel
+                                                        │ Next.js,     │     (Read-API,
+                                                        │ Bars + LLM   │      CORS-scoped)
                                                         │ Erklärungen  │
                                                         └──────────────┘
 
 Scheduler (täglich 04:00 UTC):
 - F1-ScheduleSync λ ✅ pollt OpenF1 /sessions, programmiert für jede kommende
-  Session ein aws-scheduler Schedule mit Window [start-15min, end+30min]
+  Session ein aws-scheduler Schedule mit Window [start-15min, end+30min] sowie
+  ein T-60min-Schedule, das die Inference-Lambda vor jedem Rennen auslöst
 
 Querschnitt (alle Phasen):
-- IaC: AWS CDK v2 (TypeScript)              ✅ 3 Stacks (DataLayer + Pipeline + Realtime)
+- IaC: AWS CDK v2 (TypeScript)              ✅ 4 Stacks (DataLayer + Pipeline + Realtime + Inference)
 - Geteilte Typen: packages/shared (Zod)     ✅ S3-Pfade + 6 OpenF1-Schemas + DDB-Keys
 - CI: GitHub Actions (lint+typecheck+test)  ✅ grün auf main
 - Cost-Guards: AWS Budget 5 USD/Monat       ✅ aktiv (50%/100% Alarme)
-- Observability: CloudWatch Dashboards      ✅ f1-pipeline + f1-realtime, 7 Alarme via SNS
+- Observability: CloudWatch Dashboards      ✅ f1-pipeline + f1-realtime + f1-inference, 11 Alarme via SNS
 ```
 
 ## Spec-Driven Development
@@ -101,14 +102,14 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 
 ## Phasen
 
-| #   | Phase                                                      | Status      | Ergebnis                                                                                                   |
-| --- | ---------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------- |
-| 0   | [Foundation](specs/000-foundation/spec.md)                 | ✅ done     | Monorepo + AWS-Setup + CDK + S3-Layout (deployed in eu-central-1)                                          |
-| 1   | [Data Pipeline](specs/001-data-pipeline/spec.md)           | ✅ deployed | OpenF1 → SQS → Lambda → DynamoDB + S3 (live since 2026-05-30)                                              |
-| 2   | [Live Dashboard](specs/002-dashboard/spec.md)              | ✅ deployed | F1-Realtime-Stack (WebSocket-API, 5 λ, HMAC-Auth) + Next.js/visx-Frontend live auf Vercel                  |
-| 3   | [ML Model](specs/003-ml-model/spec.md)                     | ✅ done     | XGBoost-Podium-Classifier (ROC-AUC 0.93 · Log-Loss 0.28, Test 2025) + SHAP, Artefakt `models/0.1.0/` in S3 |
-| 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md) | stub        | Inference-Lambda + Bedrock-Erklärung + Predictor-Frontend                                                  |
-| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)           | stub        | Hit-Rate-Tracking + optional Re-Training                                                                   |
+| #   | Phase                                                      | Status      | Ergebnis                                                                                                                           |
+| --- | ---------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 0   | [Foundation](specs/000-foundation/spec.md)                 | ✅ done     | Monorepo + AWS-Setup + CDK + S3-Layout (deployed in eu-central-1)                                                                  |
+| 1   | [Data Pipeline](specs/001-data-pipeline/spec.md)           | ✅ deployed | OpenF1 → SQS → Lambda → DynamoDB + S3 (live since 2026-05-30)                                                                      |
+| 2   | [Live Dashboard](specs/002-dashboard/spec.md)              | ✅ deployed | F1-Realtime-Stack (WebSocket-API, 5 λ, HMAC-Auth) + Next.js/visx-Frontend live auf Vercel                                          |
+| 3   | [ML Model](specs/003-ml-model/spec.md)                     | ✅ done     | XGBoost-Podium-Classifier (ROC-AUC 0.93 · Log-Loss 0.28, Test 2025) + SHAP, Artefakt `models/0.1.0/` in S3                         |
+| 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md) | ✅ deployed | F1-Inference-Stack (Docker-λ: XGBoost + Bedrock/Claude Haiku 4.5, T-60min-Trigger) + Read-API + Predictor-Frontend live auf Vercel |
+| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)           | stub        | Hit-Rate-Tracking + optional Re-Training                                                                                           |
 
 ## Stack
 

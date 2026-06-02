@@ -12,6 +12,7 @@ Normalized race columns (one row per race×driver):
 
 import logging
 import math
+import os
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
@@ -20,8 +21,10 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-#: Local FastF1 HTTP cache (relative to CWD; the notebook runs from `ml/`).
-CACHE_DIR = ".fastf1-cache"
+#: FastF1 HTTP cache. Defaults relative to CWD (the notebook runs from `ml/`);
+#: read-only filesystems (e.g. Lambda's `/var/task`) override via
+#: `FASTF1_CACHE_DIR` to point at a writable dir like `/tmp/.fastf1-cache`.
+CACHE_DIR = os.environ.get("FASTF1_CACHE_DIR", ".fastf1-cache")
 
 
 def _enable_cache() -> None:

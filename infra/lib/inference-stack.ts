@@ -136,6 +136,8 @@ export class InferenceStack extends Stack {
         PREDICTIONS_TABLE: this.predictionsTable.tableName,
         MODEL_BUCKET: props.dataBucket.bucketName,
         BEDROCK_MODEL_ID,
+        // Lambda's CWD (/var/task) is read-only; FastF1 must cache under /tmp.
+        FASTF1_CACHE_DIR: "/tmp/.fastf1-cache",
       },
     });
 

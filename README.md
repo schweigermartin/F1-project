@@ -51,8 +51,10 @@ Zwei zusammenhängende Systeme, die eine gemeinsame Datenpipeline teilen:
                            │          ▼                        │
                            │   ┌──────────────┐                ▼
                            │   │ apps/dashbd  │ ✅      ┌──────────────┐
-                           │   │ Next.js+visx │ Vercel  │ model.json   │
-                           │   └──────────────┘         │ in S3        │
+                           │   │ Next.js+visx │ Vercel  │ models/<ver>/│
+                           │   └──────────────┘         │ model.json + │
+                           │                            │ history.csv  │
+                           │                            │ in S3        │
                            │                            └──────┬───────┘
                            │ predictions + actuals             │
                            │ (Feedback Loop, Phase 5)          │
@@ -155,32 +157,46 @@ AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk synth
 # 5. CDK Bootstrap (einmalig pro Account/Region)
 AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk bootstrap aws://<account>/<region>
 
-# 6. Deploy (Pipeline + Realtime)
+# 6. Deploy Projekt 1 — Dashboard-Seite (Pipeline + Realtime)
 # F1-Realtime liest ein HMAC-Secret aus SSM — einmalig out-of-band anlegen:
 SECRET=$(openssl rand -hex 32)
 AWS_PROFILE=<dein-profil> aws ssm put-parameter --name /f1/ws-token-secret \
   --type SecureString --value "$SECRET" --region <region>
 # danach deployen (allowedOrigins in infra/bin/app.ts auf deine Vercel-Domain setzen):
 AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk deploy F1-DataLayer F1-Pipeline F1-Realtime
+
+# 7. Deploy Projekt 2 — Predictor-Seite (Inference + Bedrock)
+# Voraussetzung: Bedrock-Model-Access für Claude Haiku 4.5 in der Region einmalig
+# in der Konsole freischalten (Bedrock → Model access). Modell-ID in
+# infra/lib/inference-stack.ts (BEDROCK_MODEL_ID) muss zur Region passen.
+# Das Inference-λ liest das Modell-Artefakt models/<version>/ aus dem S3-Bucket —
+# es enthält model.json, model_card.md UND history.csv (vorberechnete rollierende
+# Historie; das λ lädt nur noch die Quali live, statt FastF1/Ergast zur Laufzeit
+# zu durchforsten — sonst läuft es ins 500-calls/h-Limit). Artefakt aus Phase 3.
+# allowedOrigins (Read-API CORS) in infra/bin/app.ts auf deine Predictor-Domain setzen:
+AWS_PROFILE=<dein-profil> pnpm -F @f1/infra cdk deploy F1-Inference
 ```
 
-Nach Schritt 6 existieren in deinem Account:
+Nach Schritt 6+7 existieren in deinem Account (alle 4 Stacks):
 
-- S3-Bucket `f1-data-<account>-<region>`
-- DDB Tables `F1Live` (Streams) + `F1Connections` (TTL 2h)
+- S3-Bucket `f1-data-<account>-<region>` (RETAIN — `raw/…` Live-Archiv + `models/<semver>/`)
+- DDB Tables `F1Live` (Streams, TTL 24h) + `F1Connections` (TTL 2h) + `F1Predictions` (on-demand, RETAIN, **kein** TTL — Phase 5 liest sie zurück)
 - SQS `F1-Events` + DLQ
-- API Gateway WebSocket `F1-Realtime` (Stage `live`)
-- 10 Lambdas (4 Pipeline: Poller/Consumer/Archiver/Schedule-Sync + 6 WS: Connect/Disconnect/Authorizer/Subscribe/Fanout/Replay)
-- CloudWatch Dashboards `f1-pipeline` + `f1-realtime`, 7 Alarme, SNS-Topic `f1-alerts`
+- API Gateway WebSocket `F1-Realtime` (Stage `live`) + Lambda Function URL für die Predictions-Read-API (CORS-scoped, no-auth)
+- 12 Lambdas — 4 Pipeline (Poller/Consumer/Archiver/Schedule-Sync) · 6 WS (Connect/Disconnect/Authorizer/Subscribe/Fanout/Replay) · `F1-Inference` (Docker/Python: XGBoost + Bedrock) · `F1-Predictions-Api` (Node, Read-API)
+- CloudWatch Dashboards `f1-pipeline` + `f1-realtime` + `f1-inference`, 11 Alarme, SNS-Topic `f1-alerts`
 
-Das Frontend (`apps/dashboard`) wird separat auf Vercel deployed (Root Directory `apps/dashboard`, Env-Vars `NEXT_PUBLIC_WS_URL` = WebSocketUrl-Output + `WS_TOKEN_SECRET` = dasselbe SSM-Secret).
+Beide Frontends werden separat auf Vercel deployed (je ein Projekt, eigenes Root Directory):
+
+- `apps/dashboard` — Root `apps/dashboard`, Env `NEXT_PUBLIC_WS_URL` = WebSocketUrl-Output + `WS_TOKEN_SECRET` = dasselbe SSM-Secret.
+- `apps/predictor` — Root `apps/predictor`, Env `NEXT_PUBLIC_PREDICTIONS_API_URL` = `PredictionsApiUrl`-Output (Function URL). Ohne diese Var läuft die Seite im Demo-Modus. Die Predictor-Domain muss in der Read-API-`allowedOrigins` (Schritt 7) stehen.
 
 ### Konsolen-Links (für Martins Account `128663321407`)
 
 - [CloudFormation-Stacks (eu-central-1)](https://eu-central-1.console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks?filteringStatus=active)
 - [S3-Bucket](https://eu-central-1.console.aws.amazon.com/s3/buckets/f1-data-128663321407-eu-central-1)
-- [DynamoDB `F1Live`](https://eu-central-1.console.aws.amazon.com/dynamodbv2/home?region=eu-central-1#table?name=F1Live)
+- [DynamoDB `F1Live`](https://eu-central-1.console.aws.amazon.com/dynamodbv2/home?region=eu-central-1#table?name=F1Live) · [`F1Predictions`](https://eu-central-1.console.aws.amazon.com/dynamodbv2/home?region=eu-central-1#table?name=F1Predictions)
 - [SQS `F1-Events`](https://eu-central-1.console.aws.amazon.com/sqs/v3/home?region=eu-central-1#/queues)
 - [Lambdas](https://eu-central-1.console.aws.amazon.com/lambda/home?region=eu-central-1#/functions?fo=and&o0=%3A&v0=F1-)
-- [CloudWatch Dashboard `f1-pipeline`](https://eu-central-1.console.aws.amazon.com/cloudwatch/home?region=eu-central-1#dashboards/dashboard/f1-pipeline)
+- [CloudWatch Dashboard `f1-pipeline`](https://eu-central-1.console.aws.amazon.com/cloudwatch/home?region=eu-central-1#dashboards/dashboard/f1-pipeline) · [`f1-inference`](https://eu-central-1.console.aws.amazon.com/cloudwatch/home?region=eu-central-1#dashboards/dashboard/f1-inference)
 - [Budgets](https://us-east-1.console.aws.amazon.com/billing/home#/budgets)

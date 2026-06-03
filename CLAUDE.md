@@ -10,7 +10,7 @@ F1 portfolio monorepo with two systems sharing one AWS data pipeline:
 2. **Race Outcome Predictor** — XGBoost model on historical + archived data, with Bedrock (Claude) natural-language explanations.
 3. **Feedback Loop** — predictions vs. actuals → hit-rate → re-training.
 
-Built in phases (0–5). Phases 0 + 1 are done and deployed to AWS `eu-central-1`; phases 2–5 are spec-only stubs. See `README.md` for the architecture diagram and phase status table.
+Built in phases (0–5). Phases 0–4 are done and deployed to AWS `eu-central-1` (both Next.js frontends live on Vercel); phase 5 (Feedback Loop) is a spec-only stub. See `README.md` for the architecture diagram and phase status table.
 
 ## Spec-Driven Development (read this before writing code)
 
@@ -63,16 +63,18 @@ CI (`.github/workflows/ci.yml`) runs: eslint, prettier check, typecheck, vitest,
 pnpm workspaces: `apps/*`, `infra`, `packages/*`. The `ml/` dir is **not** in the pnpm workspace — it's a separate Python toolchain (uv/pip) added in Phase 3.
 
 - `packages/shared` (`@f1/shared`) — **single source of truth** for cross-cutting types. Zod schemas, S3 path builders, DDB key helpers. Both apps and infra import from here. Per Constitution III, no duplicated schema/path/key logic anywhere else.
-- `infra` (`@f1/infra`) — AWS CDK v2 (TypeScript, ESM). Two stacks; Lambda sources live in `infra/lambda/<name>/`.
-- `apps/dashboard`, `apps/predictor` — Next.js frontends, currently stubs (Phase 2/4).
+- `infra` (`@f1/infra`) — AWS CDK v2 (TypeScript, ESM). Four stacks; Lambda sources live in `infra/lambda/<name>/`.
+- `apps/dashboard` (Phase 2), `apps/predictor` (Phase 4) — Next.js frontends, both deployed on Vercel (one Vercel project each, root = the app dir).
 - `ml` — Python ML workspace + OpenF1 fixtures in `ml/fixtures/openf1/<session_key>/`.
 
 ## Architecture essentials
 
-**Two CDK stacks** (`infra/bin/app.ts`):
+**Four CDK stacks** (`infra/bin/app.ts`):
 
 - `DataLayerStack` (Phase 0) — the S3 bucket. `RemovalPolicy.RETAIN` — it holds the only copy of the live archive; a stack destroy must never delete it.
-- `PipelineStack` (Phase 1) — everything else: DynamoDB `F1Live` (single-table, TTL, Streams, on-demand), SQS `F1-Events` + DLQ, 4 Lambdas, EventBridge rules, SNS alerts, CloudWatch dashboard + alarms.
+- `PipelineStack` (Phase 1) — the ingest path: DynamoDB `F1Live` (single-table, TTL, Streams, on-demand), SQS `F1-Events` + DLQ, 4 Lambdas, EventBridge rules, the shared SNS `f1-alerts` topic, CloudWatch dashboard + alarms.
+- `RealtimeStack` (Phase 2) — WebSocket API Gateway + 6 Lambdas (Connect/Disconnect/Authorizer/Subscribe/Fanout/Replay), `F1Connections` table, HMAC auth (`WS_TOKEN_SECRET` from SSM), `f1-realtime` dashboard. Fans the `F1Live` stream out to the dashboard.
+- `InferenceStack` (Phase 4) — the predictor: `F1Predictions` table (on-demand, **RETAIN, no TTL** — Phase 5 reads it back), a **Docker/Python** `DockerImageFunction` (XGBoost + Bedrock Claude Haiku 4.5, T-60min pre-race trigger via `Schedule-Sync`), and the `F1-Predictions-Api` Read-API (Node λ behind a CORS-scoped Function URL — the predictor frontend's only data path). `f1-inference` dashboard. Reads `models/<version>/{model.json,history.csv}` from the shared bucket — history is precomputed so inference only fetches the upcoming quali live (avoids FastF1/Ergast's 500-calls/h limit).
 
 **Ingest flow:** `Schedule-Sync λ` (daily 04:00 cron) reads OpenF1 `/sessions` and programs an aws-scheduler schedule per upcoming session → `Poller λ` (5s during sessions only, never 24/7) → `SQS+DLQ` → `Consumer λ` → DynamoDB `F1Live` + S3 `raw/sessions/.../parts/` → `Archiver λ` (15min cron) consolidates parts into one `.jsonl`.
 
@@ -91,5 +93,5 @@ pnpm workspaces: `apps/*`, `infra`, `packages/*`. The `ml/` dir is **not** in th
 - Lambdas: Node 20, ARM64, ESM bundle via esbuild, `@aws-sdk/*` marked external (provided by the runtime — don't bundle it).
 - **Cost control is mandatory** (Constitution IV): a budget alarm must exist before any Lambda deploy; polling runs only during sessions; DDB on-demand + TTL; Bedrock calls cached. Every plan documents its €/month footprint.
 - **Every Lambda needs a CloudWatch alarm** on failure/silence before it's "done" (Constitution VIII).
-- ML model artifacts go to S3 `models/<semver>/` (never `latest/`), each with a `model_card.md` (Constitution IX).
+- ML model artifacts go to S3 `models/<semver>/` (never `latest/`), each with a `model_card.md` (Constitution IX) and a `history.csv` (precomputed rolling feature history the inference λ loads instead of re-querying FastF1). Keys come from `S3_PATHS` in `@f1/shared/s3-layout` / its Python mirror `f1pred/layout.py` — never hand-build them.
 - `README.md` must stay current — it's the recruiter-facing entry point (Constitution XII).

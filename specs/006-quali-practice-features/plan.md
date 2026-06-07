@@ -36,14 +36,14 @@ FastF1: R + Q + FP1/FP2/FP3                      load_features(date, round, ver)
 
 `FEATURE_NAMES` 6 → 12 (neue ans Ende, Reihenfolge ist Vertrag). `PodiumFeatures` bekommt 6 Felder mit Ranges:
 
-| Feld | Typ | Range / Hinweis |
-| --- | --- | --- |
-| `quali_segment_reached` | int | 1–3 |
-| `quali_grid_delta` | int | z.B. −20…+20 (Grid − Quali-Pos) |
-| `quali_teammate_gap_s` | float | signiert (kann negativ sein) |
-| `practice_best_pace_gap_s` | float | ≥ 0 (Gap zur Session-Best) |
-| `practice_long_run_pace_s` | float | signiert (Gap zum Feld-Median) |
-| `practice_laps_count` | int | ≥ 0 |
+| Feld                       | Typ   | Range / Hinweis                 |
+| -------------------------- | ----- | ------------------------------- |
+| `quali_segment_reached`    | int   | 1–3                             |
+| `quali_grid_delta`         | int   | z.B. −20…+20 (Grid − Quali-Pos) |
+| `quali_teammate_gap_s`     | float | signiert (kann negativ sein)    |
+| `practice_best_pace_gap_s` | float | ≥ 0 (Gap zur Session-Best)      |
+| `practice_long_run_pace_s` | float | signiert (Gap zum Feld-Median)  |
+| `practice_laps_count`      | int   | ≥ 0                             |
 
 `_validate_row` in `inference.py` und die TS-`PredictionItemSchema`-Anzeige bleiben konsistent (Const. III/VI). `bedrock_prompt.py` bekommt deutsche Klartext-Labels für die 6 neuen Feature-Namen (für die SHAP-Begründung).
 
@@ -127,13 +127,13 @@ FastF1: R + Q + FP1/FP2/FP3                      load_features(date, round, ver)
 
 ## Kosten-Footprint
 
-| Posten | Annahme | € |
-| --- | --- | --- |
-| FastF1 Practice-Backfill | einmalig, lokaler Cache, inkrementell | 0 |
-| Training 0.2.0 | lokal, < 10 Min CPU | 0 |
-| S3 `models/0.2.0/` | wenige MB | ~0 |
-| Inference Live-Practice | +3–4 Session-Loads/Lauf, gecacht | ~0 |
-| **Gesamt** | | **≈0** |
+| Posten                   | Annahme                               | €      |
+| ------------------------ | ------------------------------------- | ------ |
+| FastF1 Practice-Backfill | einmalig, lokaler Cache, inkrementell | 0      |
+| Training 0.2.0           | lokal, < 10 Min CPU                   | 0      |
+| S3 `models/0.2.0/`       | wenige MB                             | ~0     |
+| Inference Live-Practice  | +3–4 Session-Loads/Lauf, gecacht      | ~0     |
+| **Gesamt**               |                                       | **≈0** |
 
 Im 5-USD-Budget (Const. IV); steht so in der Model-Card.
 

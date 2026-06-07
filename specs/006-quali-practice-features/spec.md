@@ -20,14 +20,14 @@ Der Podium-Klassifier (Modell `0.1.0`, Phase 3) nutzt von der Quali nur **zwei**
 
 Alle **pre-race bekannt** (Practice + Quali sind vor dem Renn-Start abgeschlossen — siehe R-4 für Sprint-Wochenenden):
 
-| Feature | Quelle | Definition |
-| --- | --- | --- |
-| `quali_segment_reached` | Quali | Ordinal 1/2/3 — höchstes erreichtes Segment (Q3 erreicht = 3). Robust gegen Strafen. |
-| `quali_grid_delta` | Quali + Grid | `grid_position − quali_position` (≥ 0 = Strafe/Rückversetzung). Fängt Grid-Strafen ab. |
-| `quali_teammate_gap_s` | Quali | Bestzeit-Rückstand zum Teamkollegen in Sekunden (+ = langsamer). Isoliert Fahrer- von Auto-Pace. |
-| `practice_best_pace_gap_s` | FP2/FP3 | Schnellste Practice-Runde als Gap zur Session-Bestzeit (Quali-Sim-Proxy). |
-| `practice_long_run_pace_s` | FP2/FP3 | Median der Stint-Runden (Renn-Sim) als Gap zum Feld-Median; NaN-Policy siehe R-3. |
-| `practice_laps_count` | FP1–FP3 | Summe gefahrener Practice-Runden (Zuverlässigkeits-/Datenmengen-Proxy). |
+| Feature                    | Quelle       | Definition                                                                                       |
+| -------------------------- | ------------ | ------------------------------------------------------------------------------------------------ |
+| `quali_segment_reached`    | Quali        | Ordinal 1/2/3 — höchstes erreichtes Segment (Q3 erreicht = 3). Robust gegen Strafen.             |
+| `quali_grid_delta`         | Quali + Grid | `grid_position − quali_position` (≥ 0 = Strafe/Rückversetzung). Fängt Grid-Strafen ab.           |
+| `quali_teammate_gap_s`     | Quali        | Bestzeit-Rückstand zum Teamkollegen in Sekunden (+ = langsamer). Isoliert Fahrer- von Auto-Pace. |
+| `practice_best_pace_gap_s` | FP2/FP3      | Schnellste Practice-Runde als Gap zur Session-Bestzeit (Quali-Sim-Proxy).                        |
+| `practice_long_run_pace_s` | FP2/FP3      | Median der Stint-Runden (Renn-Sim) als Gap zum Feld-Median; NaN-Policy siehe R-3.                |
+| `practice_laps_count`      | FP1–FP3      | Summe gefahrener Practice-Runden (Zuverlässigkeits-/Datenmengen-Proxy).                          |
 
 Feature-Set wächst damit von 6 → **12**. `FEATURE_NAMES` (geteilter Vertrag in `f1pred/schema.py` + Pydantic `PodiumFeatures`) wird die einzige Quelle der Wahrheit für Namen, Reihenfolge und Ranges — auch für `0.2.0`.
 

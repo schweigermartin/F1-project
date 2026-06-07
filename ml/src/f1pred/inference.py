@@ -33,8 +33,8 @@ DEFAULT_TOP_N = 3
 _IDENTITY_COLUMNS = ("driver_number", "driver_code")
 
 #: Columns a `LoadQuali` must return for the just-completed qualifying: driver
-#: identity + the three quali-derived passthrough features (the rolling features
-#: are computed from history, not supplied here).
+#: identity + the quali-derived passthrough features (the rolling features and the
+#: practice features are supplied separately, not here).
 QUALI_COLUMNS = [
     "driver_number",
     "driver_code",
@@ -44,6 +44,19 @@ QUALI_COLUMNS = [
     "grid_position",
     "quali_gap_to_pole_s",
     "is_wet",
+    # 0.2.0 quali features (Phase 006)
+    "quali_segment_reached",
+    "quali_grid_delta",
+    "quali_teammate_gap_s",
+]
+
+#: Columns a `LoadPractice` returns: driver identity + the three practice
+#: passthrough features for the upcoming weekend's FP1–FP3 sessions.
+PRACTICE_FEATURE_COLUMNS = [
+    "driver_code",
+    "practice_best_pace_gap_s",
+    "practice_long_run_pace_s",
+    "practice_laps_count",
 ]
 
 #: Shape `build_race_features` returns — exactly what `predict_podium` consumes.
@@ -51,6 +64,8 @@ OUTPUT_COLUMNS = ["driver_number", "driver_code", *FEATURE_NAMES]
 
 #: (race_date, round) -> the upcoming race's per-driver quali frame, or None.
 LoadQuali = Callable[[str, int], "pd.DataFrame | None"]
+#: (race_date, round) -> the upcoming weekend's per-driver practice features, or None.
+LoadPractice = Callable[[str, int], "pd.DataFrame | None"]
 
 
 @dataclass(frozen=True)
@@ -96,6 +111,12 @@ def _validate_row(row: pd.Series) -> None:
         constructor_form=float(row["constructor_form"]),
         track_history=float(row["track_history"]),
         is_wet=bool(row["is_wet"]),
+        quali_segment_reached=int(row["quali_segment_reached"]),
+        quali_grid_delta=int(row["quali_grid_delta"]),
+        quali_teammate_gap_s=float(row["quali_teammate_gap_s"]),
+        practice_best_pace_gap_s=float(row["practice_best_pace_gap_s"]),
+        practice_long_run_pace_s=float(row["practice_long_run_pace_s"]),
+        practice_laps_count=int(row["practice_laps_count"]),
     )
 
 
@@ -143,23 +164,50 @@ def predict_podium(
     return predictions
 
 
+_PRACTICE_COLS = ("practice_best_pace_gap_s", "practice_long_run_pace_s", "practice_laps_count")
+
+
+def _attach_practice(
+    quali: pd.DataFrame,
+    race_date: str,
+    round_number: int,
+    load_practice: LoadPractice | None,
+) -> pd.DataFrame:
+    """Merge the weekend's practice features onto the quali frame by driver_code.
+    Always leaves the three practice columns present (NaN where unavailable) so
+    the target build + fill policy can run regardless of practice availability."""
+    practice = load_practice(race_date, round_number) if load_practice is not None else None
+    if practice is not None and not practice.empty:
+        quali = quali.merge(practice, on="driver_code", how="left")
+    for col in _PRACTICE_COLS:
+        if col not in quali.columns:
+            quali[col] = pd.NA
+    return quali
+
+
 def build_race_features(
     race_date: str,
     round_number: int,
     *,
     load_quali: LoadQuali,
     history: pd.DataFrame,
+    load_practice: LoadPractice | None = None,
 ) -> pd.DataFrame:
-    """Build the six pre-race features for every driver of an upcoming race.
+    """Build the twelve pre-race features for every driver of an upcoming race.
 
-    Three features come straight from the just-completed qualifying (via
-    `load_quali`): `grid_position`, `quali_gap_to_pole_s`, `is_wet`. The other
-    three are rolling/historical aggregates — so we append the target race (its
-    own result unknown) to `history` and run the *same* `build_features` as
-    training, which derives `driver_form`/`constructor_form`/`track_history`
-    from prior races only (the `.shift(1)` no-leakage guarantee). Reusing one
+    Passthrough features come straight from the weekend's own sessions: the quali
+    ones (`grid_position`, `quali_gap_to_pole_s`, `is_wet`, `quali_segment_reached`,
+    `quali_grid_delta`, `quali_teammate_gap_s`) via `load_quali`, the practice ones
+    (`practice_*`) via the optional `load_practice`. The three rolling features are
+    historical aggregates — so we append the target race (its own result unknown)
+    to `history` and run the *same* `build_features` as training, which derives
+    them from prior races only (the `.shift(1)` no-leakage guarantee). Reusing one
     feature pipeline for train and inference is the point: no feature drift
     (Constitution III).
+
+    `load_practice` is optional: if absent or it returns nothing, the practice
+    columns stay missing and `build_features`' fill policy substitutes the neutral
+    constants (R-3) — a prediction is still produced.
 
     `history` must hold the normalized `RACE_COLUMNS` of past races. Drivers
     without a usable qualifying time are skipped + logged (R-4); drivers with no
@@ -184,6 +232,8 @@ def build_race_features(
     if quali.empty:
         return pd.DataFrame(columns=OUTPUT_COLUMNS)
 
+    quali = _attach_practice(quali, race_date, round_number, load_practice)
+
     year = int(race_date[:4])
     target = pd.DataFrame(
         {
@@ -195,6 +245,12 @@ def build_race_features(
             "grid_position": quali["grid_position"],
             "quali_gap_to_pole_s": quali["quali_gap_to_pole_s"],
             "is_wet": quali["is_wet"],
+            "quali_segment_reached": quali["quali_segment_reached"],
+            "quali_grid_delta": quali["quali_grid_delta"],
+            "quali_teammate_gap_s": quali["quali_teammate_gap_s"],
+            "practice_best_pace_gap_s": quali["practice_best_pace_gap_s"],
+            "practice_long_run_pace_s": quali["practice_long_run_pace_s"],
+            "practice_laps_count": quali["practice_laps_count"],
             # Inert placeholders: the target race is chronologically last, so
             # build_features' .shift(1) never reads its own result. Real 0.0
             # (not NaN) keeps the column dtype clean for the concat below.
@@ -230,8 +286,15 @@ def fastf1_load_quali(race_date: str, round_number: int) -> pd.DataFrame | None:
     import fastf1  # noqa: PLC0415 — lazy so the module imports without FastF1
     from fastf1.exceptions import RateLimitExceededError  # noqa: PLC0415
 
-    # Reuse the Phase-3 gap/cache helpers — no duplicated quali logic (Const. III).
-    from f1pred.data import _enable_cache, _quali_gap_seconds, _to_int  # noqa: PLC0415
+    # Reuse the Phase-3/006 gap/segment/teammate helpers — no duplicated quali
+    # logic (Const. III).
+    from f1pred.data import (  # noqa: PLC0415
+        _enable_cache,
+        _quali_gap_seconds,
+        _quali_segment_reached,
+        _quali_teammate_gap,
+        _to_int,
+    )
 
     year = int(race_date[:4])
     _enable_cache()
@@ -255,16 +318,46 @@ def fastf1_load_quali(race_date: str, round_number: int) -> pd.DataFrame | None:
     rows = []
     for _, r in qres.iterrows():
         code = str(r["Abbreviation"])
+        team = str(r["TeamName"])
         rows.append(
             {
                 "driver_number": _to_int(r.get("DriverNumber")),
                 "driver_code": code,
                 "driver": code,
-                "constructor": str(r["TeamName"]),
+                "constructor": team,
                 "circuit": circuit,
                 "grid_position": _to_int(r.get("Position")),  # quali classification
                 "quali_gap_to_pole_s": _quali_gap_seconds(quali, code, pole_time),
                 "is_wet": is_wet,
+                "quali_segment_reached": _quali_segment_reached(qres, code),
+                # Pre-race the penalised starting grid isn't in FastF1 yet, so we
+                # can't know the grid↔quali delta live → assume no penalty (0).
+                # A documented inference-time limitation; training has the real grid.
+                "quali_grid_delta": 0,
+                "quali_teammate_gap_s": _quali_teammate_gap(qres, code, team),
             }
         )
     return pd.DataFrame(rows, columns=QUALI_COLUMNS)
+
+
+def fastf1_load_practice(race_date: str, round_number: int) -> pd.DataFrame | None:
+    """Load the upcoming weekend's FP1–FP3 practice features as a
+    PRACTICE_FEATURE_COLUMNS frame (the `LoadPractice` the lambda injects).
+    Reuses data._practice_features_by_driver (Const. III). Rate limits propagate
+    (R-1 backoff); None if no driver ran. Not exercised in CI."""
+    from f1pred.data import _practice_features_by_driver  # noqa: PLC0415
+
+    year = int(race_date[:4])
+    by_driver = _practice_features_by_driver(year, round_number)
+    if not by_driver:
+        return None
+    rows = [
+        {
+            "driver_code": code,
+            "practice_best_pace_gap_s": feats.get("practice_best_pace_gap_s"),
+            "practice_long_run_pace_s": feats.get("practice_long_run_pace_s"),
+            "practice_laps_count": feats.get("practice_laps_count", 0),
+        }
+        for code, feats in by_driver.items()
+    ]
+    return pd.DataFrame(rows, columns=PRACTICE_FEATURE_COLUMNS)

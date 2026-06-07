@@ -148,6 +148,21 @@ def _quali_frame() -> pd.DataFrame:
             "grid_position": [1, 3, 15, 20],
             "quali_gap_to_pole_s": [0.0, 0.3, 1.1, np.nan],
             "is_wet": [True, True, True, True],
+            "quali_segment_reached": [3, 3, 1, 1],
+            "quali_grid_delta": [0, 0, 0, 0],
+            "quali_teammate_gap_s": [-0.2, 0.1, 0.3, 0.0],
+        }
+    )
+
+
+def _practice_frame() -> pd.DataFrame:
+    """Upcoming-weekend practice features for the drivers with quali times."""
+    return pd.DataFrame(
+        {
+            "driver_code": ["VER", "HAM", "ROO"],
+            "practice_best_pace_gap_s": [0.0, 0.25, 0.9],
+            "practice_long_run_pace_s": [-0.3, 0.1, 0.5],
+            "practice_laps_count": [62, 60, 58],
         }
     )
 
@@ -170,8 +185,37 @@ def test_build_race_features_passes_quali_values_through() -> None:
     assert ver["grid_position"] == 1
     assert ver["quali_gap_to_pole_s"] == 0.0
     assert bool(ver["is_wet"]) is True
+    assert ver["quali_segment_reached"] == 3
+    assert ver["quali_teammate_gap_s"] == pytest.approx(-0.2)
     # Rolling features come from history (VER scored 25 every prior round).
     assert ver["driver_form"] == pytest.approx(25.0)
+
+
+def test_build_race_features_merges_live_practice() -> None:
+    feats = build_race_features(
+        "2026-06-07",
+        6,
+        load_quali=lambda _d, _r: _quali_frame(),
+        history=_history(),
+        load_practice=lambda _d, _r: _practice_frame(),
+    )
+    ver = feats[feats["driver_code"] == "VER"].iloc[0]
+    assert ver["practice_best_pace_gap_s"] == pytest.approx(0.0)
+    assert ver["practice_long_run_pace_s"] == pytest.approx(-0.3)
+    assert ver["practice_laps_count"] == 62
+
+
+def test_build_race_features_fills_practice_when_absent() -> None:
+    from f1pred.features import NEUTRAL_LONG_RUN_GAP, NEUTRAL_PRACTICE_PACE_GAP
+
+    # No load_practice → practice columns missing → filled with neutral constants.
+    feats = build_race_features(
+        "2026-06-07", 6, load_quali=lambda _d, _r: _quali_frame(), history=_history()
+    )
+    ver = feats[feats["driver_code"] == "VER"].iloc[0]
+    assert ver["practice_best_pace_gap_s"] == pytest.approx(NEUTRAL_PRACTICE_PACE_GAP)
+    assert ver["practice_long_run_pace_s"] == pytest.approx(NEUTRAL_LONG_RUN_GAP)
+    assert ver["practice_laps_count"] == 0
 
 
 def test_build_race_features_skips_driver_without_quali_time(

@@ -81,9 +81,11 @@ def build_features(races: pd.DataFrame, *, window: int = ROLLING_WINDOW) -> pd.D
 
     # The 0.2.0 passthrough features are expected as input columns; fill the
     # neutral-constant ones (track_history + quali_teammate_gap + practice) so a
-    # valid "absent" state survives instead of being dropped.
+    # valid "absent" state survives instead of being dropped. to_numeric coerces
+    # object/pd.NA columns to float first, so fillna doesn't hit the deprecated
+    # object-downcast path.
     for col, fill in _FILLS.items():
-        df[col] = df[col].fillna(fill)
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(fill)
 
     out = df.loc[:, _KEYS + list(FEATURE_NAMES)]
     return out.dropna(subset=_DROP_IF_MISSING).sort_index()

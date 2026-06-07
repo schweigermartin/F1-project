@@ -17,11 +17,14 @@ import { z } from "zod";
 export const PREDICTION_API_SCHEMA_VERSION = 1 as const;
 
 /**
- * The six pre-race features, in the exact order the model expects them.
+ * The twelve pre-race features, in the exact order the model expects them.
  * Mirrors `FEATURE_NAMES` in `ml/src/f1pred/schema.py` (cross-language, same
  * pattern as `layout.py` ↔ `s3-layout.ts`). If the model gains/loses a feature
  * the two lists diverge and SHAP rows fail this enum loudly — which is the
  * point: a silent feature mismatch would mean a silent mis-explanation.
+ *
+ * The trailing six are the 0.2.0 additions (Phase 006): richer quali signal +
+ * practice pace.
  */
 export const PODIUM_FEATURE_NAMES = [
   "grid_position",
@@ -30,6 +33,12 @@ export const PODIUM_FEATURE_NAMES = [
   "constructor_form",
   "track_history",
   "is_wet",
+  "quali_segment_reached",
+  "quali_grid_delta",
+  "quali_teammate_gap_s",
+  "practice_best_pace_gap_s",
+  "practice_long_run_pace_s",
+  "practice_laps_count",
 ] as const;
 export type PodiumFeatureName = (typeof PODIUM_FEATURE_NAMES)[number];
 export const PodiumFeatureNameSchema = z.enum(PODIUM_FEATURE_NAMES);

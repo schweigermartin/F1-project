@@ -20,7 +20,8 @@ BEDROCK_PROMPT_VERSION = "v1"
 #: Max sentences the model may produce per driver (AC-2).
 MAX_EXPLANATION_SENTENCES = 3
 
-#: Human-readable German labels for the six model features (mirror of the TS).
+#: Human-readable German labels for the twelve model features (mirror of the TS
+#: FEATURE_LABELS_DE in bedrock-prompts.ts — the two MUST stay identical).
 FEATURE_LABELS_DE: dict[str, str] = {
     "grid_position": "Startplatz",
     "quali_gap_to_pole_s": "Qualifying-Rückstand auf die Pole",
@@ -28,6 +29,12 @@ FEATURE_LABELS_DE: dict[str, str] = {
     "constructor_form": "aktuelle Form des Teams",
     "track_history": "bisherige Ergebnisse auf dieser Strecke",
     "is_wet": "Regen-/Nässebedingungen",
+    "quali_segment_reached": "erreichtes Qualifying-Segment (Q1/Q2/Q3)",
+    "quali_grid_delta": "Startplatz-Verschiebung gegenüber dem Qualifying",
+    "quali_teammate_gap_s": "Qualifying-Rückstand auf den Teamkollegen",
+    "practice_best_pace_gap_s": "beste Pace im Training",
+    "practice_long_run_pace_s": "Long-Run-Pace im Training (Renn-Simulation)",
+    "practice_laps_count": "Trainingsumfang (gefahrene Runden)",
 }
 
 # Verbatim mirror of the TS template — kept on single lines (noqa: E501) so the

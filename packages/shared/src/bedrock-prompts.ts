@@ -22,10 +22,11 @@ export const BEDROCK_PROMPT_VERSION = "v1" as const;
 export const MAX_EXPLANATION_SENTENCES = 3;
 
 /**
- * Human-readable German labels for the six model features. Used to turn raw
+ * Human-readable German labels for the twelve model features. Used to turn raw
  * SHAP feature names into prose the prompt (and ultimately the fan) can read.
  * Keys are the `PodiumFeatureName` union, so adding a feature without a label
- * is a compile error (Constitution VI).
+ * is a compile error (Constitution VI). Mirror of `FEATURE_LABELS_DE` in
+ * `ml/src/f1pred/bedrock_prompt.py` — the two MUST stay identical.
  */
 export const FEATURE_LABELS_DE: Record<ShapContribution["feature"], string> = {
   grid_position: "Startplatz",
@@ -34,6 +35,12 @@ export const FEATURE_LABELS_DE: Record<ShapContribution["feature"], string> = {
   constructor_form: "aktuelle Form des Teams",
   track_history: "bisherige Ergebnisse auf dieser Strecke",
   is_wet: "Regen-/Nässebedingungen",
+  quali_segment_reached: "erreichtes Qualifying-Segment (Q1/Q2/Q3)",
+  quali_grid_delta: "Startplatz-Verschiebung gegenüber dem Qualifying",
+  quali_teammate_gap_s: "Qualifying-Rückstand auf den Teamkollegen",
+  practice_best_pace_gap_s: "beste Pace im Training",
+  practice_long_run_pace_s: "Long-Run-Pace im Training (Renn-Simulation)",
+  practice_laps_count: "Trainingsumfang (gefahrene Runden)",
 };
 
 /**

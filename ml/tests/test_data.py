@@ -49,6 +49,12 @@ def _race(year: int, rnd: int) -> pd.DataFrame:
                 "grid_position": 1,
                 "quali_gap_to_pole_s": 0.0,
                 "is_wet": False,
+                "quali_segment_reached": 3,
+                "quali_grid_delta": 0,
+                "quali_teammate_gap_s": -0.1,
+                "practice_best_pace_gap_s": 0.0,
+                "practice_long_run_pace_s": -0.2,
+                "practice_laps_count": 60,
                 "points": 25.0,
                 "finish_position": 1,
             }

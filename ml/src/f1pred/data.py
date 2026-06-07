@@ -145,6 +145,63 @@ def _quali_gap_seconds(quali: Any, abbreviation: str, pole_time: Any) -> float |
     return float((best - pole_time).total_seconds())
 
 
+def _best_quali_seconds(row: "pd.Series[Any]") -> float | None:
+    """Best of a quali row's Q1/Q2/Q3 laps, in seconds. None if no time was set.
+
+    Filters NaT explicitly rather than `Series.min()`: a row sliced across the
+    mixed-dtype results frame is object-dtype, where `min()` over Timedelta+NaT
+    raises instead of skipping the NaT."""
+    secs = [
+        t.total_seconds()
+        for c in ("Q1", "Q2", "Q3")
+        if (t := row.get(c)) is not None and not pd.isna(t)
+    ]
+    return min(secs) if secs else None
+
+
+def _quali_segment_reached(qres: pd.DataFrame, abbreviation: str) -> int | None:
+    """Highest qualifying segment the driver reached: 3 (Q3), 2 (Q2), 1 (Q1).
+
+    A set time in a segment means the driver took part in it, so the highest
+    segment with a lap time is the one reached. Robust to grid penalties — those
+    move the *grid*, not the segment reached. None if the driver set no time.
+    """
+    row = qres[qres["Abbreviation"] == abbreviation]
+    if row.empty:
+        return None
+    r = row.iloc[0]
+    for segment, col in ((3, "Q3"), (2, "Q2"), (1, "Q1")):
+        if col in r.index and not pd.isna(r[col]):
+            return segment
+    return None
+
+
+def _quali_grid_delta(grid_position: int | None, quali_position: int | None) -> int | None:
+    """`grid_position - quali_position` (>0 = started further back than qualified,
+    i.e. a grid penalty/relegation). None if either position is unknown."""
+    if grid_position is None or quali_position is None:
+        return None
+    return int(grid_position) - int(quali_position)
+
+
+def _quali_teammate_gap(qres: pd.DataFrame, abbreviation: str, team: str) -> float | None:
+    """Best-lap gap to the team-mate in seconds: `driver_best - teammate_best`
+    (+ = the driver is slower). Isolates driver pace from car pace. None if no
+    team-mate is classified or either driver set no time. With two cars per team
+    the gap is symmetric (one driver's + is the other's −)."""
+    driver_row = qres[qres["Abbreviation"] == abbreviation]
+    if driver_row.empty:
+        return None
+    driver_best = _best_quali_seconds(driver_row.iloc[0])
+    if driver_best is None:
+        return None
+    mates = qres[(qres["TeamName"] == team) & (qres["Abbreviation"] != abbreviation)]
+    mate_bests = [s for _, r in mates.iterrows() if (s := _best_quali_seconds(r)) is not None]
+    if not mate_bests:
+        return None
+    return driver_best - min(mate_bests)
+
+
 def _to_int(value: Any) -> int | None:
     """Coerce a pandas cell (numpy float/int, NaN, str) to int, or None."""
     if value is None or (isinstance(value, float) and math.isnan(value)):

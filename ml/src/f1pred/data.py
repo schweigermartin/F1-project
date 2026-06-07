@@ -202,6 +202,69 @@ def _quali_teammate_gap(qres: pd.DataFrame, abbreviation: str, team: str) -> flo
     return driver_best - min(mate_bests)
 
 
+# ── Practice (FP1–FP3) pace helpers ───────────────────────────────────────────
+# All operate on a *normalized* practice-laps frame so they're net-free testable;
+# the FastF1 loader (T5) flattens raw FP laps into these columns first.
+
+#: Columns a normalized practice-laps frame carries (one row per driver lap).
+PRACTICE_LAP_COLUMNS = ["driver_code", "lap_time_s", "stint", "is_accurate"]
+
+#: Minimum accurate laps in a stint to count as a long run (race simulation).
+MIN_LONG_RUN_LAPS = 5
+
+
+def _practice_laps_count(laps: pd.DataFrame, driver_code: str) -> int:
+    """Total laps the driver completed (all laps, accurate or not) — a
+    reliability/running proxy. 0 if the driver did not run."""
+    return int((laps["driver_code"] == driver_code).sum())
+
+
+def _practice_best_pace_gap(laps: pd.DataFrame, driver_code: str) -> float | None:
+    """Driver's fastest accurate lap as a gap to the session best, seconds (>= 0).
+    None if the driver set no accurate lap or the session has none (quali-sim proxy)."""
+    acc = laps[laps["is_accurate"] & laps["lap_time_s"].notna()]
+    if acc.empty:
+        return None
+    driver = acc[acc["driver_code"] == driver_code]
+    if driver.empty:
+        return None
+    return float(driver["lap_time_s"].min()) - float(acc["lap_time_s"].min())
+
+
+def _driver_long_run_seconds(laps: pd.DataFrame, driver_code: str) -> float | None:
+    """Median of the driver's long-run laps (accurate laps in stints of at least
+    MIN_LONG_RUN_LAPS), in seconds. None if the driver has no qualifying stint.
+    No fuel/tyre correction (documented simplification, D-8)."""
+    d = laps[
+        (laps["driver_code"] == driver_code)
+        & laps["is_accurate"]
+        & laps["lap_time_s"].notna()
+    ]
+    run_laps: list[float] = []
+    for _, stint_laps in d.groupby("stint"):
+        if len(stint_laps) >= MIN_LONG_RUN_LAPS:
+            run_laps.extend(float(t) for t in stint_laps["lap_time_s"])
+    if not run_laps:
+        return None
+    return float(pd.Series(run_laps).median())
+
+
+def _practice_long_run_pace(laps: pd.DataFrame, driver_code: str) -> float | None:
+    """Driver's long-run median as a gap to the field's long-run median, seconds
+    (signed; + = slower). None if the driver has no long run or the field has none."""
+    own = _driver_long_run_seconds(laps, driver_code)
+    if own is None:
+        return None
+    field = [
+        v
+        for code in laps["driver_code"].unique()
+        if (v := _driver_long_run_seconds(laps, str(code))) is not None
+    ]
+    if not field:
+        return None
+    return own - float(pd.Series(field).median())
+
+
 def _to_int(value: Any) -> int | None:
     """Coerce a pandas cell (numpy float/int, NaN, str) to int, or None."""
     if value is None or (isinstance(value, float) and math.isnan(value)):

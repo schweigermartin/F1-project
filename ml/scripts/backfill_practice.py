@@ -38,30 +38,28 @@ logger = logging.getLogger("backfill")
 _RATE_LIMIT_SLEEP_S = 3600 + 120
 
 
-def _load_checkpoint(path: Path) -> tuple[list[pd.DataFrame], set[tuple[int, int]]]:
-    """Existing rows + the set of (year, round) already fetched, from the CSV."""
+def _done_keys(path: Path) -> set[tuple[int, int]]:
+    """The set of (year, round) already in the checkpoint CSV."""
     if not path.exists():
-        return [], set()
-    df = pd.read_csv(path)
+        return set()
+    df = pd.read_csv(path, usecols=["year", "round"])
     done = {(int(y), int(r)) for y, r in zip(df["year"], df["round"], strict=True)}
     logger.info("resuming: %d rounds already in %s", len(done), path)
-    return [df], done
+    return done
 
 
-def _write(frames: list[pd.DataFrame], path: Path) -> None:
-    """Atomically rewrite the checkpoint CSV (small data; safe after each round)."""
-    combined = pd.concat(frames, ignore_index=True)[RACE_COLUMNS]
-    tmp = path.with_suffix(".tmp")
-    combined.to_csv(tmp, index=False)
-    tmp.replace(path)
+def _append(race: pd.DataFrame, path: Path) -> None:
+    """Append one race's rows to the checkpoint CSV (header only when new). Appending
+    per round keeps progress durable without re-concatenating the whole dataset."""
+    race[RACE_COLUMNS].to_csv(path, mode="a", header=not path.exists(), index=False)
 
 
 def backfill(first: int, last: int, out: Path, *, sleep_on_limit: bool, limit: int | None) -> int:
     """Fetch every round in [first, last], checkpointing after each. Returns the
     number of rounds still missing (0 = complete). `limit` caps how many rounds
     this invocation fetches (a smoke test: one round before the full pull)."""
-    frames, done = _load_checkpoint(out)
     out.parent.mkdir(parents=True, exist_ok=True)
+    done = _done_keys(out)
 
     # Plan the work first (one cheap schedule call per season) so we can report
     # progress and what's left to fetch.
@@ -96,10 +94,9 @@ def backfill(first: int, last: int, out: Path, *, sleep_on_limit: bool, limit: i
             # is cheap and avoids permanently dropping a round that later appears.
             logger.warning("no data for %s round %s — skipping", year, rnd)
             continue
-        frames.append(race)
-        _write(frames, out)
+        _append(race, out)
 
-    total_rows = sum(len(f) for f in frames)
+    total_rows = len(pd.read_csv(out, usecols=["year"])) if out.exists() else 0
     logger.info("backfill complete: %d race-driver rows in %s", total_rows, out)
     return 0
 

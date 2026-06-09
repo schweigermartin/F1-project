@@ -24,8 +24,11 @@ import { INFERENCE_FN_NAME, INFERENCE_SCHEDULER_ROLE_NAME } from "./inference-st
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const lambdaDir = (sub: string): string => path.resolve(__dirname, "..", "lambda", sub);
 
-/** Active published model the inference schedules point at (models/<v>/, Ph. 3). */
-const ACTIVE_MODEL_VERSION = "0.1.0";
+/** Active published model the inference schedules point at (models/<v>/, Ph. 3).
+ * 0.2.0 (Phase 6: +6 quali/practice features) passed the roll-out gate vs 0.1.0
+ * on the 2025 test fold (ROC-AUC + log-loss both better). 0.1.0 stays in S3 as
+ * the fallback — flip this constant back + redeploy to revert. */
+const ACTIVE_MODEL_VERSION = "0.2.0";
 
 export interface PipelineStackProps extends StackProps {
   readonly dataBucket: IBucket;

@@ -1,7 +1,7 @@
 # Tasks: Quali- & Practice-Features (Modell 0.2.0)
 
 > **Plan:** [plan.md](./plan.md)
-> **Status:** draft — zur Review, noch kein Code.
+> **Status:** done — T1–T13 umgesetzt, Modell 0.2.0 (Gate bestanden) deployed, `phase-6-done` getaggt.
 
 Reihenfolge bewusst: geteilter Feature-Vertrag zuerst → pure Helfer + Pipeline
 (offline + in CI testbar) → Data-Layer-Verdrahtung → Backfill + Training + Eval

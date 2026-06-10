@@ -1,7 +1,7 @@
 # Spec: Quali- & Practice-Features (Modell 0.2.0)
 
 > **Phase:** 006
-> **Status:** draft — Spec zur Review, noch kein plan.md/tasks.md
+> **Status:** done — Modell 0.2.0 trainiert, Roll-out-Gate vs 0.1.0 bestanden, deployed (README Phase 6)
 > **Owner:** Martin
 > **Constitution:** IX (versionierte Artefakte, reproduzierbare Läufe, kein Leakage), VI (Typsicherheit + Validierung an Grenzen), III (geteilter Feature-Vertrag, einmal gebaut), X (Tests für die Feature-Pipeline), IV (Kosten / FastF1-Rate-Limit), XII (README aktuell).
 

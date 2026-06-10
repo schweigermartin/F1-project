@@ -1,7 +1,7 @@
 # Plan: Quali- & Practice-Features (Modell 0.2.0)
 
 > **Spec:** [spec.md](./spec.md)
-> **Status:** draft — Plan zur Review, noch kein tasks.md
+> **Status:** done — umgesetzt, Modell 0.2.0 deployed (README Phase 6)
 > **Phasen 3+4 werden erweitert, nicht neu gebaut.**
 
 ## Architektur

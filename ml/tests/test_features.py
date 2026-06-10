@@ -15,6 +15,13 @@ RACES = pd.DataFrame(
         "grid_position": [1, 2, 1, 3, 2, 1, 1, 2],
         "quali_gap_to_pole_s": [0.0, 0.2, 0.0, 0.3, 0.1, 0.0, 0.0, 0.15],
         "is_wet": [False, False, False, False, True, True, False, False],
+        # 0.2.0 passthrough features (from each race's own quali/practice).
+        "quali_segment_reached": [3, 3, 3, 3, 3, 3, 3, 3],
+        "quali_grid_delta": [0, 0, 0, 1, 1, 0, 0, 0],
+        "quali_teammate_gap_s": [-0.2, 0.2, -0.3, 0.3, 0.1, -0.1, -0.15, 0.15],
+        "practice_best_pace_gap_s": [0.0, 0.3, 0.0, 0.4, 0.2, 0.0, 0.0, 0.25],
+        "practice_long_run_pace_s": [-0.3, 0.3, -0.2, 0.2, 0.1, -0.1, -0.2, 0.2],
+        "practice_laps_count": [60, 58, 62, 55, 50, 61, 59, 57],
         "points": [25, 18, 25, 18, 18, 25, 25, 18],
         "finish_position": [1, 2, 1, 2, 2, 1, 1, 2],
     }
@@ -67,5 +74,54 @@ def test_no_leakage_from_the_current_race_result() -> None:
 def test_drops_rows_missing_a_mandatory_feature() -> None:
     src = RACES.copy()
     src.loc[src["round"] == 4, "grid_position"] = None
+    out = build_features(src)
+    assert (out["round"] == 4).sum() == 0
+
+
+# ── T4: 0.2.0 passthrough features + missing policy ────────────────────────
+
+
+def test_outputs_all_twelve_features() -> None:
+    out = build_features(RACES)
+    assert list(FEATURE_NAMES) == [
+        "grid_position", "quali_gap_to_pole_s", "driver_form", "constructor_form",
+        "track_history", "is_wet", "quali_segment_reached", "quali_grid_delta",
+        "quali_teammate_gap_s", "practice_best_pace_gap_s", "practice_long_run_pace_s",
+        "practice_laps_count",
+    ]
+    for col in FEATURE_NAMES:
+        assert col in out.columns
+
+
+def test_missing_practice_is_filled_not_dropped() -> None:
+    from f1pred.features import (
+        NEUTRAL_LONG_RUN_GAP,
+        NEUTRAL_PRACTICE_PACE_GAP,
+    )
+
+    src = RACES.copy()
+    last = src["round"] == 4
+    practice_cols = ["practice_best_pace_gap_s", "practice_long_run_pace_s", "practice_laps_count"]
+    src.loc[last, practice_cols] = None
+    out = build_features(src)
+    r4 = out[out["round"] == 4]
+    assert len(r4) == 2  # not dropped
+    assert (r4["practice_best_pace_gap_s"] == NEUTRAL_PRACTICE_PACE_GAP).all()
+    assert (r4["practice_long_run_pace_s"] == NEUTRAL_LONG_RUN_GAP).all()
+    assert (r4["practice_laps_count"] == 0.0).all()
+
+
+def test_missing_teammate_gap_is_filled_with_zero() -> None:
+    src = RACES.copy()
+    src.loc[src["round"] == 4, "quali_teammate_gap_s"] = None
+    out = build_features(src)
+    r4 = out[out["round"] == 4]
+    assert len(r4) == 2
+    assert (r4["quali_teammate_gap_s"] == 0.0).all()
+
+
+def test_missing_quali_segment_drops_the_row() -> None:
+    src = RACES.copy()
+    src.loc[src["round"] == 4, "quali_segment_reached"] = None
     out = build_features(src)
     assert (out["round"] == 4).sum() == 0

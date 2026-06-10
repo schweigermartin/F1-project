@@ -43,6 +43,13 @@ RACE_COLUMNS = [
     "grid_position",
     "quali_gap_to_pole_s",
     "is_wet",
+    # 0.2.0 passthrough features (Phase 006)
+    "quali_segment_reached",
+    "quali_grid_delta",
+    "quali_teammate_gap_s",
+    "practice_best_pace_gap_s",
+    "practice_long_run_pace_s",
+    "practice_laps_count",
     "points",
     "finish_position",
 ]
@@ -108,28 +115,114 @@ def fastf1_load_race(year: int, rnd: int) -> pd.DataFrame | None:
     if results is None or len(results) == 0:
         return None
 
-    pole_time = quali.results["Q3"].dropna().min() if quali.results is not None else None
+    qres = getattr(quali, "results", None)
+    pole_time = qres["Q3"].dropna().min() if qres is not None else None
     is_wet = bool(getattr(race, "weather_data", pd.DataFrame()).get("Rainfall", pd.Series()).any())
     circuit = str(race.event["EventName"])
 
+    # Quali classification position per driver (for the grid-delta) and the
+    # FP1–FP3 pace features, computed once per race (Const. III: reuse helpers).
+    quali_pos = (
+        {str(a): _to_int(p) for a, p in zip(qres["Abbreviation"], qres["Position"], strict=False)}
+        if qres is not None
+        else {}
+    )
+    practice = _practice_features_by_driver(year, rnd)
+
     rows = []
     for _, r in results.iterrows():
-        quali_gap = _quali_gap_seconds(quali, r["Abbreviation"], pole_time)
+        abbr = str(r["Abbreviation"])
+        team = str(r["TeamName"])
+        pf = practice.get(abbr, {})
         rows.append(
             {
                 "year": year,
                 "round": rnd,
-                "driver": str(r["Abbreviation"]),
-                "constructor": str(r["TeamName"]),
+                "driver": abbr,
+                "constructor": team,
                 "circuit": circuit,
                 "grid_position": _to_int(r.get("GridPosition")),
-                "quali_gap_to_pole_s": quali_gap,
+                "quali_gap_to_pole_s": _quali_gap_seconds(quali, abbr, pole_time),
                 "is_wet": is_wet,
+                "quali_segment_reached": (
+                    _quali_segment_reached(qres, abbr) if qres is not None else None
+                ),
+                "quali_grid_delta": _quali_grid_delta(
+                    _to_int(r.get("GridPosition")), quali_pos.get(abbr)
+                ),
+                "quali_teammate_gap_s": (
+                    _quali_teammate_gap(qres, abbr, team) if qres is not None else None
+                ),
+                "practice_best_pace_gap_s": pf.get("practice_best_pace_gap_s"),
+                "practice_long_run_pace_s": pf.get("practice_long_run_pace_s"),
+                "practice_laps_count": pf.get("practice_laps_count", 0),
                 "points": float(r.get("Points", 0.0)),
                 "finish_position": _to_int(r.get("Position")),
             }
         )
     return pd.DataFrame(rows, columns=RACE_COLUMNS)
+
+
+def _normalize_practice_laps(laps: Any, stint_offset: int) -> pd.DataFrame:
+    """Flatten a FastF1 FP laps frame into PRACTICE_LAP_COLUMNS. `stint_offset`
+    keeps stint numbers distinct when frames from several sessions are pooled."""
+    if laps is None or len(laps) == 0:
+        return pd.DataFrame(columns=PRACTICE_LAP_COLUMNS)
+    accurate = (
+        laps["IsAccurate"].astype(bool)
+        if "IsAccurate" in laps
+        else pd.Series([False] * len(laps), index=laps.index)
+    )
+    out = pd.DataFrame(
+        {
+            "driver_code": laps["Driver"].astype(str),
+            "lap_time_s": laps["LapTime"].dt.total_seconds(),
+            "stint": laps["Stint"].fillna(0).astype(int) + stint_offset,
+            "is_accurate": accurate,
+        }
+    )
+    return out.reset_index(drop=True)
+
+
+def _load_practice_session_laps(
+    year: int, rnd: int, identifier: str, stint_offset: int
+) -> pd.DataFrame:
+    """Load one practice session's laps as PRACTICE_LAP_COLUMNS. Rate limits
+    propagate (R-1 backoff); a missing/cancelled session yields an empty frame
+    (the fill policy in features.py handles the absence, R-3/R-4)."""
+    import fastf1  # noqa: PLC0415
+    from fastf1.exceptions import RateLimitExceededError  # noqa: PLC0415
+
+    _enable_cache()
+    try:
+        session = fastf1.get_session(year, rnd, identifier)
+        session.load(laps=True, telemetry=False, weather=False, messages=False)
+    except RateLimitExceededError:
+        raise
+    except Exception as exc:  # noqa: BLE001 — FastF1 raises broadly on missing data
+        logger.warning("FastF1 %s load failed for %s round %s: %s", identifier, year, rnd, exc)
+        return pd.DataFrame(columns=PRACTICE_LAP_COLUMNS)
+    return _normalize_practice_laps(getattr(session, "laps", None), stint_offset)
+
+
+def _practice_features_by_driver(year: int, rnd: int) -> dict[str, dict[str, float | None]]:
+    """Per-driver practice features (D-4): pace from FP2+FP3, laps count from
+    FP1–FP3. Stint offsets keep per-session stints from merging."""
+    fp1 = _load_practice_session_laps(year, rnd, "FP1", 0)
+    fp2 = _load_practice_session_laps(year, rnd, "FP2", 1000)
+    fp3 = _load_practice_session_laps(year, rnd, "FP3", 2000)
+    pace_laps = pd.concat([fp2, fp3], ignore_index=True)
+    all_laps = pd.concat([fp1, fp2, fp3], ignore_index=True)
+    if all_laps.empty:
+        return {}
+    return {
+        code: {
+            "practice_best_pace_gap_s": _practice_best_pace_gap(pace_laps, code),
+            "practice_long_run_pace_s": _practice_long_run_pace(pace_laps, code),
+            "practice_laps_count": _practice_laps_count(all_laps, code),
+        }
+        for code in (str(c) for c in all_laps["driver_code"].unique())
+    }
 
 
 def _quali_gap_seconds(quali: Any, abbreviation: str, pole_time: Any) -> float | None:
@@ -143,6 +236,126 @@ def _quali_gap_seconds(quali: Any, abbreviation: str, pole_time: Any) -> float |
     if pd.isna(best):
         return None
     return float((best - pole_time).total_seconds())
+
+
+def _best_quali_seconds(row: "pd.Series[Any]") -> float | None:
+    """Best of a quali row's Q1/Q2/Q3 laps, in seconds. None if no time was set.
+
+    Filters NaT explicitly rather than `Series.min()`: a row sliced across the
+    mixed-dtype results frame is object-dtype, where `min()` over Timedelta+NaT
+    raises instead of skipping the NaT."""
+    secs = [
+        t.total_seconds()
+        for c in ("Q1", "Q2", "Q3")
+        if (t := row.get(c)) is not None and not pd.isna(t)
+    ]
+    return min(secs) if secs else None
+
+
+def _quali_segment_reached(qres: pd.DataFrame, abbreviation: str) -> int | None:
+    """Highest qualifying segment the driver reached: 3 (Q3), 2 (Q2), 1 (Q1).
+
+    A set time in a segment means the driver took part in it, so the highest
+    segment with a lap time is the one reached. Robust to grid penalties — those
+    move the *grid*, not the segment reached. None if the driver set no time.
+    """
+    row = qres[qres["Abbreviation"] == abbreviation]
+    if row.empty:
+        return None
+    r = row.iloc[0]
+    for segment, col in ((3, "Q3"), (2, "Q2"), (1, "Q1")):
+        if col in r.index and not pd.isna(r[col]):
+            return segment
+    return None
+
+
+def _quali_grid_delta(grid_position: int | None, quali_position: int | None) -> int | None:
+    """`grid_position - quali_position` (>0 = started further back than qualified,
+    i.e. a grid penalty/relegation). None if either position is unknown."""
+    if grid_position is None or quali_position is None:
+        return None
+    return int(grid_position) - int(quali_position)
+
+
+def _quali_teammate_gap(qres: pd.DataFrame, abbreviation: str, team: str) -> float | None:
+    """Best-lap gap to the team-mate in seconds: `driver_best - teammate_best`
+    (+ = the driver is slower). Isolates driver pace from car pace. None if no
+    team-mate is classified or either driver set no time. With two cars per team
+    the gap is symmetric (one driver's + is the other's −)."""
+    driver_row = qres[qres["Abbreviation"] == abbreviation]
+    if driver_row.empty:
+        return None
+    driver_best = _best_quali_seconds(driver_row.iloc[0])
+    if driver_best is None:
+        return None
+    mates = qres[(qres["TeamName"] == team) & (qres["Abbreviation"] != abbreviation)]
+    mate_bests = [s for _, r in mates.iterrows() if (s := _best_quali_seconds(r)) is not None]
+    if not mate_bests:
+        return None
+    return driver_best - min(mate_bests)
+
+
+# ── Practice (FP1–FP3) pace helpers ───────────────────────────────────────────
+# All operate on a *normalized* practice-laps frame so they're net-free testable;
+# the FastF1 loader (T5) flattens raw FP laps into these columns first.
+
+#: Columns a normalized practice-laps frame carries (one row per driver lap).
+PRACTICE_LAP_COLUMNS = ["driver_code", "lap_time_s", "stint", "is_accurate"]
+
+#: Minimum accurate laps in a stint to count as a long run (race simulation).
+MIN_LONG_RUN_LAPS = 5
+
+
+def _practice_laps_count(laps: pd.DataFrame, driver_code: str) -> int:
+    """Total laps the driver completed (all laps, accurate or not) — a
+    reliability/running proxy. 0 if the driver did not run."""
+    return int((laps["driver_code"] == driver_code).sum())
+
+
+def _practice_best_pace_gap(laps: pd.DataFrame, driver_code: str) -> float | None:
+    """Driver's fastest accurate lap as a gap to the session best, seconds (>= 0).
+    None if the driver set no accurate lap or the session has none (quali-sim proxy)."""
+    acc = laps[laps["is_accurate"] & laps["lap_time_s"].notna()]
+    if acc.empty:
+        return None
+    driver = acc[acc["driver_code"] == driver_code]
+    if driver.empty:
+        return None
+    return float(driver["lap_time_s"].min()) - float(acc["lap_time_s"].min())
+
+
+def _driver_long_run_seconds(laps: pd.DataFrame, driver_code: str) -> float | None:
+    """Median of the driver's long-run laps (accurate laps in stints of at least
+    MIN_LONG_RUN_LAPS), in seconds. None if the driver has no qualifying stint.
+    No fuel/tyre correction (documented simplification, D-8)."""
+    d = laps[
+        (laps["driver_code"] == driver_code)
+        & laps["is_accurate"]
+        & laps["lap_time_s"].notna()
+    ]
+    run_laps: list[float] = []
+    for _, stint_laps in d.groupby("stint"):
+        if len(stint_laps) >= MIN_LONG_RUN_LAPS:
+            run_laps.extend(float(t) for t in stint_laps["lap_time_s"])
+    if not run_laps:
+        return None
+    return float(pd.Series(run_laps).median())
+
+
+def _practice_long_run_pace(laps: pd.DataFrame, driver_code: str) -> float | None:
+    """Driver's long-run median as a gap to the field's long-run median, seconds
+    (signed; + = slower). None if the driver has no long run or the field has none."""
+    own = _driver_long_run_seconds(laps, driver_code)
+    if own is None:
+        return None
+    field = [
+        v
+        for code in laps["driver_code"].unique()
+        if (v := _driver_long_run_seconds(laps, str(code))) is not None
+    ]
+    if not field:
+        return None
+    return own - float(pd.Series(field).median())
 
 
 def _to_int(value: Any) -> int | None:

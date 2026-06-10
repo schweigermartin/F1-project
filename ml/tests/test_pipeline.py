@@ -26,6 +26,15 @@ def _synthetic_races(seed: int = 7) -> pd.DataFrame:
                         "grid_position": int(g),
                         "quali_gap_to_pole_s": float(max(0.0, (g - 1) * 0.15)),
                         "is_wet": bool(rng.integers(0, 2)),
+                        # 0.2.0 passthrough features (Phase 006), derived from grid.
+                        "quali_segment_reached": int(np.clip(4 - (g + 2) // 3, 1, 3)),
+                        "quali_grid_delta": int(rng.integers(-2, 3)),
+                        "quali_teammate_gap_s": float(rng.normal(0, 0.2)),
+                        "practice_best_pace_gap_s": float(
+                            max(0.0, (g - 1) * 0.1 + rng.normal(0, 0.1))
+                        ),
+                        "practice_long_run_pace_s": float(rng.normal(0, 0.3)),
+                        "practice_laps_count": int(rng.integers(30, 70)),
                         "points": float(max(0, 11 - finish)),
                         "finish_position": finish,
                     }

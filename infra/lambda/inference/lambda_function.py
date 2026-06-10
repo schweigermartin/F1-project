@@ -29,7 +29,7 @@ from f1pred.aws_io import (
 )
 from f1pred.data import RACE_COLUMNS
 from f1pred.ddb_keys import explanation_sk, race_pk
-from f1pred.inference import build_race_features, fastf1_load_quali
+from f1pred.inference import build_race_features, fastf1_load_practice, fastf1_load_quali
 from f1pred.inference_handler import (
     ExplanationKey,
     ExplanationRecord,
@@ -70,13 +70,19 @@ def _load_model(version: str) -> XGBClassifier:
 
 def _load_features(race_date: str, round_number: int, version: str) -> Any:
     # Rolling features come from the precomputed history bundled with the model
-    # (models/<version>/history.csv); only the upcoming quali is fetched live, so
-    # FastF1's 500-calls/h limit is never hit on a cold /tmp cache.
+    # (models/<version>/history.csv); only the upcoming weekend's quali + practice
+    # are fetched live, so FastF1's 500-calls/h limit is never hit on a cold /tmp
+    # cache. reindex tolerates a history.csv that predates the 0.2.0 columns (the
+    # extra columns are only needed on the target row, which comes from live data).
     path = f"/tmp/history-{version}.csv"  # noqa: S108 — Lambda's only writable dir
     _s3.download_file(_MODEL_BUCKET, model_history_key(version), path)
-    history = pd.read_csv(path)[RACE_COLUMNS]
+    history = pd.read_csv(path).reindex(columns=RACE_COLUMNS)
     return build_race_features(
-        race_date, round_number, load_quali=fastf1_load_quali, history=history
+        race_date,
+        round_number,
+        load_quali=fastf1_load_quali,
+        history=history,
+        load_practice=fastf1_load_practice,
     )
 
 

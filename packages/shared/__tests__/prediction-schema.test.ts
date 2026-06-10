@@ -68,7 +68,7 @@ describe("ShapContributionSchema", () => {
 });
 
 describe("PODIUM_FEATURE_NAMES", () => {
-  it("mirrors the six pre-race features in model order (sync with ml/.../schema.py)", () => {
+  it("mirrors the twelve pre-race features in model order (sync with ml/.../schema.py)", () => {
     expect(PODIUM_FEATURE_NAMES).toEqual([
       "grid_position",
       "quali_gap_to_pole_s",
@@ -76,6 +76,12 @@ describe("PODIUM_FEATURE_NAMES", () => {
       "constructor_form",
       "track_history",
       "is_wet",
+      "quali_segment_reached",
+      "quali_grid_delta",
+      "quali_teammate_gap_s",
+      "practice_best_pace_gap_s",
+      "practice_long_run_pace_s",
+      "practice_laps_count",
     ]);
   });
 });

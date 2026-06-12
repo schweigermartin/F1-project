@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 
 import { PodiumPredictions } from "../components/PodiumPredictions";
-import { DEMO_PREDICTIONS, DEMO_RACE } from "../lib/demo-data";
+import { SeasonPerformance } from "../components/SeasonPerformance";
+import { DEMO_PREDICTIONS, DEMO_RACE, DEMO_SEASON_EVALUATIONS } from "../lib/demo-data";
+import { fetchSeasonEvaluations } from "../lib/evaluations-api";
 import { fetchRacePredictions } from "../lib/predictions-api";
 import { getSeasonSchedule, pickTargetRace } from "../lib/schedule";
 
@@ -15,11 +17,14 @@ const DEMO = !process.env["NEXT_PUBLIC_PREDICTIONS_API_URL"];
 
 export default async function PredictorPage(): Promise<ReactNode> {
   const target = DEMO ? DEMO_RACE : await resolveTargetRace();
-  const response = DEMO
-    ? DEMO_PREDICTIONS
-    : target
-      ? await fetchRacePredictions(target.date, target.round)
-      : null;
+  // Season of the target race = the season the chart shows (Phase 5, AC-3).
+  const season = target ? Number(target.date.slice(0, 4)) : new Date().getUTCFullYear();
+  const [response, seasonEvaluations] = DEMO
+    ? [DEMO_PREDICTIONS, DEMO_SEASON_EVALUATIONS]
+    : await Promise.all([
+        target ? fetchRacePredictions(target.date, target.round) : Promise.resolve(null),
+        fetchSeasonEvaluations(season),
+      ]);
 
   return (
     <main>
@@ -37,6 +42,7 @@ export default async function PredictorPage(): Promise<ReactNode> {
         raceName={target?.name ?? null}
         raceDate={target?.date ?? null}
       />
+      <SeasonPerformance response={seasonEvaluations} />
     </main>
   );
 }

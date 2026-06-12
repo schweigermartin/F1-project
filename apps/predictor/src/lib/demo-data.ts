@@ -1,4 +1,4 @@
-import type { PredictionApiResponse } from "@f1/shared";
+import type { PredictionApiResponse, SeasonEvaluationResponse } from "@f1/shared";
 
 import type { ScheduledRace } from "./schedule";
 
@@ -79,6 +79,75 @@ export const DEMO_PREDICTIONS: PredictionApiResponse = {
         model_id: "claude-haiku-4-5",
         cached_at: "2026-06-07T13:00:05+00:00",
       },
+    },
+  ],
+};
+
+/** Three evaluated demo races so the season chart (Phase 5) renders a visible
+ * trend in demo mode and the Playwright smoke can assert on it. */
+export const DEMO_SEASON_EVALUATIONS: SeasonEvaluationResponse = {
+  schema_version: 1,
+  season: 2026,
+  races: [
+    {
+      race_date: "2026-05-03",
+      round: 6,
+      season: 2026,
+      model_version: "0.1.0",
+      n_drivers: 20,
+      top3_hit_rate: 1 / 3,
+      brier_score: 0.19,
+      predicted_top3: [
+        { driver_number: 1, driver_code: "VER", podium_probability: 0.72 },
+        { driver_number: 16, driver_code: "LEC", podium_probability: 0.64 },
+        { driver_number: 44, driver_code: "HAM", podium_probability: 0.41 },
+      ],
+      actual_top3: [
+        { driver_number: 4, driver_code: "NOR", position: 1 },
+        { driver_number: 81, driver_code: null, position: 2 },
+        { driver_number: 1, driver_code: "VER", position: 3 },
+      ],
+      evaluated_at: "2026-05-03T17:05:00+00:00",
+    },
+    {
+      race_date: "2026-05-24",
+      round: 8,
+      season: 2026,
+      model_version: "0.2.0",
+      n_drivers: 20,
+      top3_hit_rate: 2 / 3,
+      brier_score: 0.13,
+      predicted_top3: [
+        { driver_number: 16, driver_code: "LEC", podium_probability: 0.78 },
+        { driver_number: 1, driver_code: "VER", podium_probability: 0.69 },
+        { driver_number: 4, driver_code: "NOR", podium_probability: 0.55 },
+      ],
+      actual_top3: [
+        { driver_number: 16, driver_code: "LEC", position: 1 },
+        { driver_number: 1, driver_code: "VER", position: 2 },
+        { driver_number: 44, driver_code: "HAM", position: 3 },
+      ],
+      evaluated_at: "2026-05-24T16:40:00+00:00",
+    },
+    {
+      race_date: DEMO_RACE.date,
+      round: DEMO_RACE.round,
+      season: 2026,
+      model_version: "0.2.0",
+      n_drivers: 20,
+      top3_hit_rate: 1,
+      brier_score: 0.08,
+      predicted_top3: [
+        { driver_number: 16, driver_code: "LEC", podium_probability: 0.83 },
+        { driver_number: 1, driver_code: "VER", podium_probability: 0.61 },
+        { driver_number: 4, driver_code: "NOR", podium_probability: 0.47 },
+      ],
+      actual_top3: [
+        { driver_number: 16, driver_code: "LEC", position: 1 },
+        { driver_number: 4, driver_code: "NOR", position: 2 },
+        { driver_number: 1, driver_code: "VER", position: 3 },
+      ],
+      evaluated_at: "2026-06-07T17:00:00+00:00",
     },
   ],
 };

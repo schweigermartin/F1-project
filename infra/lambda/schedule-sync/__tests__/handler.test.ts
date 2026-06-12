@@ -250,6 +250,42 @@ describe("syncSchedules — inference schedules (Phase 4)", () => {
     expect(result.inferenceUpserted[0]!.round).toBe(2);
   });
 
+  it("does not count cancelled races toward the round (official numbering skips them)", async () => {
+    // 2026 regression: two cancelled spring races must not shift later rounds —
+    // the frontend queries by the Jolpica round and the Phase-5 evaluation λ
+    // re-derives the same round to find these predictions again.
+    const m = makeMocks({
+      sessions: [
+        makeSession({
+          key: 11200,
+          start: "2026-03-15T15:00:00+00:00",
+          end: "2026-03-15T17:00:00+00:00",
+        }), // past round 1
+        makeSession({
+          key: 11261,
+          start: "2026-04-12T15:00:00+00:00",
+          end: "2026-04-12T17:00:00+00:00",
+          cancelled: true,
+        }),
+        makeSession({
+          key: 11269,
+          start: "2026-04-19T15:00:00+00:00",
+          end: "2026-04-19T17:00:00+00:00",
+          cancelled: true,
+        }),
+        makeSession({
+          key: 11291,
+          start: "2026-05-24T20:00:00+00:00",
+          end: "2026-05-24T22:00:00+00:00",
+        }), // upcoming — round 2, NOT 4
+      ],
+    });
+    const result = await syncSchedules(m.deps);
+
+    expect(result.inferenceUpserted).toHaveLength(1);
+    expect(result.inferenceUpserted[0]!.round).toBe(2);
+  });
+
   it("sweeps a stale inference schedule that no longer maps to a race", async () => {
     const m = makeMocks({
       sessions: [

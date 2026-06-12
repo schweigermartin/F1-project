@@ -73,15 +73,18 @@ export class SessionResolutionError extends Error {
 const PREDICTION_SK_PREFIX = "prediction#";
 
 /**
- * Championship round = this race's 1-based position among the season's races,
- * sorted by start date — the exact logic schedule-sync uses to stamp the
- * inference event (D-3), so the PK here matches the one the predictions were
- * written under.
+ * Championship round = this race's 1-based position among the season's
+ * NON-CANCELLED races, sorted by start date — the exact logic schedule-sync
+ * uses to stamp the inference event (D-3), so the PK here matches the one the
+ * predictions were written under. Cancelled races must not count: the official
+ * numbering (Jolpica, which the frontend queries by) skips them — verified
+ * against the 2026 season, where two cancelled spring races would otherwise
+ * shift every later round by two.
  */
 export function raceRound(session: Session, seasonRaces: Session[]): number {
-  const sorted = [...seasonRaces].sort(
-    (a, b) => new Date(a.date_start).getTime() - new Date(b.date_start).getTime(),
-  );
+  const sorted = seasonRaces
+    .filter((r) => !r.is_cancelled)
+    .sort((a, b) => new Date(a.date_start).getTime() - new Date(b.date_start).getTime());
   return sorted.findIndex((r) => r.session_key === session.session_key) + 1;
 }
 

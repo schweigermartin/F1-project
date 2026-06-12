@@ -143,6 +143,18 @@ describe("raceRound", () => {
   it("returns 0 for a race missing from the season list", () => {
     expect(raceRound(session({ session_key: 777 }), seasonRaces())).toBe(0);
   });
+
+  it("skips cancelled races — official numbering (and the prediction PK) does too", () => {
+    // 2026 regression: two cancelled spring races would otherwise shift every
+    // later round by two and orphan the predictions written by schedule-sync.
+    const withCancelled = [
+      session({ session_key: 100, date_start: "2026-03-08T13:00:00+00:00" }),
+      session({ session_key: 101, date_start: "2026-04-12T13:00:00+00:00", is_cancelled: true }),
+      session({ session_key: 102, date_start: "2026-04-19T13:00:00+00:00", is_cancelled: true }),
+      session(), // 12345, 2026-06-07
+    ];
+    expect(raceRound(session(), withCancelled)).toBe(2);
+  });
 });
 
 describe("finalPositions", () => {

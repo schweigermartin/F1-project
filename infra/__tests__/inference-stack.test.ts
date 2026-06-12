@@ -206,3 +206,58 @@ describe("InferenceStack — read-API", () => {
     });
   });
 });
+
+describe("InferenceStack — evaluation lambda (Phase 5 feedback loop)", () => {
+  it("is an ARM64 Node function with table + bucket in its env", () => {
+    synth().hasResourceProperties("AWS::Lambda::Function", {
+      FunctionName: "F1-Evaluation",
+      Architectures: ["arm64"],
+      Environment: {
+        Variables: Match.objectLike({
+          PREDICTIONS_TABLE: Match.anyValue(),
+          DATA_BUCKET_NAME: Match.anyValue(),
+        }),
+      },
+    });
+  });
+
+  it("is triggered by the archiver's SessionArchived event (AC-1)", () => {
+    synth().hasResourceProperties("AWS::Events::Rule", {
+      EventPattern: {
+        source: ["f1.archiver"],
+        "detail-type": ["SessionArchived"],
+      },
+    });
+  });
+
+  it("holds exactly Query + PutItem on the predictions table (no Get/Delete)", () => {
+    synth().hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({ Action: ["dynamodb:Query", "dynamodb:PutItem"] }),
+        ]),
+      },
+    });
+  });
+
+  it("reads only the session archive prefix from the data bucket", () => {
+    const json = JSON.stringify(synth().toJSON());
+    expect(json).toContain("raw/sessions/*");
+  });
+
+  it("alarms on any evaluation error → the SNS alert topic (AC-6)", () => {
+    synth().hasResourceProperties("AWS::CloudWatch::Alarm", {
+      AlarmName: "F1-Evaluation-Errors",
+      Threshold: 0,
+      ComparisonOperator: "GreaterThanThreshold",
+      AlarmActions: Match.anyValue(),
+    });
+  });
+
+  it("is tagged Phase 5 (stack default is 4 — cost attribution)", () => {
+    synth().hasResourceProperties("AWS::Lambda::Function", {
+      FunctionName: "F1-Evaluation",
+      Tags: Match.arrayWith([Match.objectLike({ Key: "Phase", Value: "5" })]),
+    });
+  });
+});

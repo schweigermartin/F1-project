@@ -143,3 +143,24 @@ export function predictionSK(driverNumber: number): string {
 export function explanationSK(driverNumber: number): string {
   return `explanation#${driverNumber.toString().padStart(2, "0")}`;
 }
+
+/**
+ * Phase-5 evaluation keys. Each evaluated race is written twice with the same
+ * payload (spec D-4 — denormalized instead of a GSI; one writer, idempotent):
+ *
+ *   PK = race#<date>#<round>   SK = evaluation        (race detail view)
+ *   PK = season#<year>         SK = eval#<round>      (one-Query season chart)
+ */
+export const SEASON_PK_PREFIX = "season" as const;
+
+/** SK of the per-race evaluation row, under the same PK as its predictions. */
+export const EVALUATION_SK = "evaluation" as const;
+
+export function seasonPK(year: number): string {
+  return `${SEASON_PK_PREFIX}#${year}`;
+}
+
+/** Per-round evaluation row under the season PK; padded like racePK's round. */
+export function evalSK(round: number): string {
+  return `eval#${round.toString().padStart(2, "0")}`;
+}

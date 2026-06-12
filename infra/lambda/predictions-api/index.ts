@@ -3,7 +3,12 @@ import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { PK_ATTR } from "@f1/shared";
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 
-import { getRacePredictions, InvalidQueryError, RaceNotFoundError } from "./handler.js";
+import {
+  getRacePredictions,
+  getSeasonEvaluations,
+  InvalidQueryError,
+  RaceNotFoundError,
+} from "./handler.js";
 
 const PREDICTIONS_TABLE = process.env["PREDICTIONS_TABLE"];
 if (!PREDICTIONS_TABLE) throw new Error("PREDICTIONS_TABLE env var not set");
@@ -50,7 +55,13 @@ function json(
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   try {
-    const response = await getRacePredictions(event.queryStringParameters ?? null, { queryRace });
+    const query = event.queryStringParameters ?? null;
+    // Two modes on one URL: `?season=<year>` (Phase 5 chart) vs the original
+    // `?race_date=&round=` (Phase 4 predictions). Routed here, logic in handler.ts.
+    const response =
+      query && query["season"] !== undefined
+        ? await getSeasonEvaluations(query, { queryRace })
+        : await getRacePredictions(query, { queryRace });
     return json(200, response);
   } catch (err) {
     if (err instanceof InvalidQueryError) return json(400, { error: err.message });

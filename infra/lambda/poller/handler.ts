@@ -56,6 +56,14 @@ const OPENF1_BASE = "https://api.openf1.org/v1";
 const MAX_RETRIES = 3; // initial + 2 retries on 429
 const WEATHER_INTERVAL_SECONDS = 30;
 
+/** Tick cadence inside one invocation (plan §3: 5s snapshots). */
+export const POLL_INTERVAL_MS = 5_000;
+/** How long one invocation keeps ticking. aws-scheduler's smallest recurring
+ * rate is 1 minute (rate(5 seconds) is rejected with a ValidationException —
+ * found in production), so the scheduler fires once per minute and this loop
+ * fills the minute with 5s ticks. 55s leaves margin under the λ timeout. */
+export const POLL_WINDOW_MS = 55_000;
+
 /**
  * Weather should fire once per 30s window. With a 5s tick rule, the first
  * tick of each 30s window matches `seconds % 30 < 5`. Stateless (no DDB
@@ -111,6 +119,30 @@ async function fetchWithBackoff(
     };
   }
   /* c8 ignore next */ return { kind: "http-fail" }; // unreachable
+}
+
+/**
+ * One scheduler firing = one minute of 5s snapshots. Ticks `pollOnce` every
+ * POLL_INTERVAL_MS until POLL_WINDOW_MS is used up (wall-clock via deps.now,
+ * so a slow tick eats into the window instead of overrunning the λ timeout).
+ * Returns every tick's summary; the adapter logs them as one line.
+ */
+export async function pollSession(
+  event: PollerEvent,
+  deps: PollerDeps,
+  windowMs: number = POLL_WINDOW_MS,
+): Promise<PollerSummary[]> {
+  const startedAt = deps.now().getTime();
+  const summaries: PollerSummary[] = [];
+  for (;;) {
+    const tickStart = deps.now().getTime();
+    summaries.push(await pollOnce(event, deps));
+    const nextTickAt = tickStart + POLL_INTERVAL_MS;
+    if (nextTickAt >= startedAt + windowMs) break;
+    const wait = nextTickAt - deps.now().getTime();
+    if (wait > 0) await deps.sleep(wait);
+  }
+  return summaries;
 }
 
 export async function pollOnce(event: PollerEvent, deps: PollerDeps): Promise<PollerSummary> {

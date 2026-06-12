@@ -114,7 +114,9 @@ export class PipelineStack extends Stack {
       handler: "handler",
       ...lambdaDefaults,
       memorySize: 256,
-      timeout: Duration.seconds(10),
+      // One invocation = one minute of 5s ticks (POLL_WINDOW_MS 55s — the
+      // scheduler can't fire sub-minute); 75s leaves margin for the last tick.
+      timeout: Duration.seconds(75),
       environment: { EVENTS_QUEUE_URL: this.eventsQueue.queueUrl },
     });
     this.eventsQueue.grantSendMessages(this.pollerFn);

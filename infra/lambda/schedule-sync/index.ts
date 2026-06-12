@@ -45,7 +45,11 @@ async function scheduleExists(name: string): Promise<boolean> {
 async function upsertSchedule(spec: ScheduleSpec): Promise<void> {
   const params = {
     Name: spec.name,
-    ScheduleExpression: "rate(5 seconds)",
+    // aws-scheduler's smallest recurring rate is 1 minute — rate(5 seconds)
+    // is rejected with a ValidationException (production incident: no poll
+    // schedule was ever created). The poller fills each minute with 5s ticks
+    // itself (pollSession), preserving the 5s cadence from the plan.
+    ScheduleExpression: "rate(1 minute)",
     StartDate: spec.startsAt,
     EndDate: spec.endsAt,
     FlexibleTimeWindow: { Mode: "OFF" as const },

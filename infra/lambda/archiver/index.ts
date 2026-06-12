@@ -1,3 +1,4 @@
+import { EventBridgeClient, PutEventsCommand } from "@aws-sdk/client-eventbridge";
 import {
   DeleteObjectsCommand,
   GetObjectCommand,
@@ -6,6 +7,11 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import {
+  ARCHIVER_EVENT_SOURCE,
+  SESSION_ARCHIVED_DETAIL_TYPE,
+  type SessionArchivedDetail,
+} from "@f1/shared";
 
 import { archive } from "./handler.js";
 
@@ -13,6 +19,7 @@ const BUCKET_NAME = process.env["DATA_BUCKET_NAME"];
 if (!BUCKET_NAME) throw new Error("DATA_BUCKET_NAME env var not set");
 
 const s3 = new S3Client({});
+const eventBridge = new EventBridgeClient({});
 
 async function listSessionFolders(): Promise<Array<{ date: string; session_id: string }>> {
   const folders: Array<{ date: string; session_id: string }> = [];
@@ -104,6 +111,40 @@ export async function handler(): Promise<{ ok: boolean; result: unknown }> {
             Delete: { Objects: chunk.map((Key) => ({ Key })) },
           }),
         );
+      }
+    },
+    // Phase 5 (AC-1): one SessionArchived event per consolidated session on the
+    // default bus — the Evaluation λ (InferenceStack) listens for it. The error
+    // log line feeds the ArchiverNotifyFailures metric filter/alarm; the handler
+    // catches the rethrow so the archive run itself stays green.
+    notifySessionArchived: async (date, session_id) => {
+      try {
+        const detail: SessionArchivedDetail = { date, session_id };
+        const res = await eventBridge.send(
+          new PutEventsCommand({
+            Entries: [
+              {
+                Source: ARCHIVER_EVENT_SOURCE,
+                DetailType: SESSION_ARCHIVED_DETAIL_TYPE,
+                Detail: JSON.stringify(detail),
+              },
+            ],
+          }),
+        );
+        if ((res.FailedEntryCount ?? 0) > 0) {
+          throw new Error(res.Entries?.[0]?.ErrorMessage ?? "PutEvents entry failed");
+        }
+      } catch (err) {
+        console.error(
+          JSON.stringify({
+            level: "error",
+            msg: "archiver.notify_failed",
+            date,
+            session_id,
+            error: String(err),
+          }),
+        );
+        throw err;
       }
     },
     now: () => new Date(),

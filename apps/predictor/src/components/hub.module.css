@@ -1,0 +1,461 @@
+/* Race Weekend Hub layout + panel styles. All colours/spacing via shared
+ * design tokens (var(--…)). Components apply the global `.card` class plus a
+ * panel class from here. */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--space-lg);
+  margin-top: var(--space-xl);
+}
+
+.col4 {
+  grid-column: span 12;
+}
+.col6 {
+  grid-column: span 12;
+}
+.col8 {
+  grid-column: span 12;
+}
+.col12 {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 720px) {
+  .col4 {
+    grid-column: span 6;
+  }
+  .col6 {
+    grid-column: span 6;
+  }
+  .col8 {
+    grid-column: span 6;
+  }
+}
+@media (min-width: 1000px) {
+  .col4 {
+    grid-column: span 4;
+  }
+  .col6 {
+    grid-column: span 6;
+  }
+  .col8 {
+    grid-column: span 8;
+  }
+}
+
+.panelHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+.panelTitle {
+  font-size: 1.05rem;
+}
+.panelMeta {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ── Weekend header ────────────────────────────────────────────────────── */
+.header {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xl);
+}
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.raceName {
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  line-height: 1.05;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.raceMeta {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.flag {
+  width: 2.4rem;
+  height: 1.6rem;
+  border-radius: 3px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+/* ── Countdown ─────────────────────────────────────────────────────────── */
+.countdown {
+  display: flex;
+  gap: var(--space-md);
+}
+.cdUnit {
+  min-width: 3.6rem;
+  text-align: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+}
+.cdNum {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cdLabel {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.cdTarget {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: var(--space-xs);
+  text-align: right;
+}
+
+/* ── Session timeline ──────────────────────────────────────────────────── */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.session {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+}
+.sessionNext {
+  border-color: var(--accent);
+  background: rgba(225, 6, 0, 0.08);
+}
+.sessionLive {
+  border-color: var(--pos);
+  background: rgba(74, 222, 128, 0.1);
+}
+.sessionPast {
+  opacity: 0.5;
+}
+.sessionDot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.sessionNext .sessionDot {
+  background: var(--accent);
+}
+.sessionLive .sessionDot {
+  background: var(--pos);
+  box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+  animation: pulse 1.6s infinite;
+}
+.sessionName {
+  font-weight: 600;
+}
+.sessionTime {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.liveTag {
+  color: var(--pos);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(74, 222, 128, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+  }
+}
+
+/* ── Circuit map ───────────────────────────────────────────────────────── */
+.mapWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  max-height: 360px;
+}
+.trackPath {
+  fill: none;
+  stroke: var(--surface-2);
+  stroke-width: 4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.trackPathInner {
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.lapDot {
+  fill: var(--fg);
+  filter: drop-shadow(0 0 4px var(--accent));
+}
+.mapPlaceholder {
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+/* ── Weather ───────────────────────────────────────────────────────────── */
+.wxGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+}
+.wxTile {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+.wxVal {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.wxLabel {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.wxLive {
+  color: var(--pos);
+}
+
+/* ── Podium board ──────────────────────────────────────────────────────── */
+.podium {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.driver {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+.driverBtn {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 2.2rem 1fr auto auto;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.driverFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  opacity: 0.22;
+  animation: grow 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  transform-origin: left;
+}
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.teamBar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+}
+.rank {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  z-index: 1;
+}
+.driverCode {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  z-index: 1;
+}
+.driverTeam {
+  font-size: 0.75rem;
+  color: var(--muted);
+  z-index: 1;
+}
+.prob {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  z-index: 1;
+}
+.cacheBadge {
+  z-index: 1;
+  opacity: 0.7;
+}
+.detail {
+  padding: 0 var(--space-lg) var(--space-lg);
+  border-top: 1px solid var(--border);
+}
+.reason {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: var(--space-md) 0;
+}
+.reasonPending {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ── SHAP waterfall ────────────────────────────────────────────────────── */
+.waterfall {
+  width: 100%;
+}
+.wfLabel {
+  font-size: 0.72rem;
+  fill: var(--muted);
+}
+.wfValPos {
+  fill: var(--pos);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.wfValNeg {
+  fill: var(--neg);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Grid vs prediction ────────────────────────────────────────────────── */
+.gvp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.gvpRow {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr 3rem;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: 0.9rem;
+}
+.gvpGrid {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Track history ─────────────────────────────────────────────────────── */
+.histList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.histRow {
+  display: grid;
+  grid-template-columns: 3rem 0.5rem 1fr auto;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: 0.9rem;
+}
+.histYear {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.teamDot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+}
+.histTeam {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* ── Live / result panel ───────────────────────────────────────────────── */
+.liveBadge {
+  color: var(--pos);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.resultRow {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr auto;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+}
+.hit {
+  background: rgba(74, 222, 128, 0.12);
+  border-left: 3px solid var(--pos);
+}
+.miss {
+  background: rgba(248, 113, 113, 0.1);
+  border-left: 3px solid var(--neg);
+}
+
+/* ── Mini standings ────────────────────────────────────────────────────── */
+.standTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.standTable td {
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--border);
+}
+.standPos {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  width: 1.6rem;
+}
+.standPts {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* ── Empty states ──────────────────────────────────────────────────────── */
+.empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}

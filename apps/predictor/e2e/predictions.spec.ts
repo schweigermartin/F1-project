@@ -1,40 +1,37 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * Smoke test (Constitution X): open the predictor and assert the core user
- * flow. Against the local dev server this runs in demo mode (seeded board), so
- * it's hermetic — no Read-API needed. Against a deployed preview (BASE_URL set)
- * it asserts the same shell over real predictions.
+ * Smoke test (Constitution X): open the Race Weekend Hub and assert the core
+ * panels + flow. Against the local dev server this runs in demo mode (seeded
+ * data), so it's hermetic — no Read-API needed. Against a deployed preview
+ * (BASE_URL set) it asserts the same shell over real data.
  */
-test("loads, lists drivers sorted by podium probability, click opens the reason", async ({
-  page,
-}) => {
+test("renders the weekend hub panels and the podium flow", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Podiums-Predictor" })).toBeVisible();
+  // AC-1: weekend header with the race name (demo → Canada).
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
-  // The board renders one bar (button) per driver.
-  const bars = page.getByRole("button");
-  await expect(bars.first()).toBeVisible();
-  expect(await bars.count()).toBeGreaterThanOrEqual(3);
+  // The hub panels are present (AC-2/3/4/5/7/9).
+  await expect(page.getByRole("heading", { name: "Strecke" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Zeitplan" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Wetter" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Podiums-Vorhersage" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Saison-Performance" })).toBeVisible();
 
-  // US-1: bars are ordered by descending podium probability. Read the integer
-  // percentage out of each bar's text ("LEC 83 %" → 83).
-  const texts = await bars.allInnerTexts();
+  // The podium board renders one card per driver, sorted by descending podium
+  // probability (US-1). Read the clean "NN %" out of each card's prob badge.
+  const probs = page.getByTestId("podium-prob");
+  expect(await probs.count()).toBeGreaterThanOrEqual(3);
+  const texts = await probs.allInnerTexts();
   const percentages = texts.map((t) => Number.parseInt(t.replace(/[^\d]/g, ""), 10));
   const sorted = [...percentages].sort((a, b) => b - a);
   expect(percentages).toEqual(sorted);
 
-  // US-2: clicking a bar expands its Bedrock explanation.
-  const top = bars.first();
+  // AC-5: clicking the top card expands its SHAP + Bedrock explanation.
+  const top = probs.first().locator("xpath=ancestor::button");
   await expect(top).toHaveAttribute("aria-expanded", "false");
   await top.click();
   await expect(top).toHaveAttribute("aria-expanded", "true");
-  // The seeded top driver (LEC) carries a known explanation sentence.
   await expect(page.getByText(/Souveräne Pole-Position/)).toBeVisible();
-
-  // Phase 5 (AC-3): the season-performance chart renders below the board —
-  // in demo mode with three seeded evaluations, against a deployed preview
-  // possibly as its empty state; either way the section must be there.
-  await expect(page.getByRole("heading", { name: "Saison-Performance" })).toBeVisible();
 });

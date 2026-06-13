@@ -86,7 +86,9 @@ export function PodiumBoard({
                 ) : (
                   <span />
                 )}
-                <span className={`${styles.prob} tnum`}>{pct(d.podium_probability)}</span>
+                <span className={`${styles.prob} tnum`} data-testid="podium-prob">
+                  {pct(d.podium_probability)}
+                </span>
               </button>
 
               {isOpen ? (

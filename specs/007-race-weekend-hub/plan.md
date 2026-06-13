@@ -103,13 +103,13 @@ Layout (CSS-Grid, responsive):
 
 ## 7. Failure-Modes (Constitution V/VI)
 
-| Quelle weg | Verhalten |
-| --- | --- |
-| OpenF1 `/sessions` | Timeline fällt auf Jolpica-Renndatum zurück |
-| Circuit-GeoJSON | Karte zeigt Platzhalter, kein Layout-Sprung |
-| Open-Meteo | „Wetter nicht verfügbar" |
-| Live-Poll Fehler | Stoppt Poll, zeigt letztes Jolpica-Ergebnis |
-| Read-API 404 | bestehender „vor T-60min"-Empty-State |
+| Quelle weg             | Verhalten                                                |
+| ---------------------- | -------------------------------------------------------- |
+| OpenF1 `/sessions`     | Timeline fällt auf Jolpica-Renndatum zurück              |
+| Circuit-GeoJSON        | Karte zeigt Platzhalter, kein Layout-Sprung              |
+| Open-Meteo             | „Wetter nicht verfügbar"                                 |
+| Live-Poll Fehler       | Stoppt Poll, zeigt letztes Jolpica-Ergebnis              |
+| Read-API 404           | bestehender „vor T-60min"-Empty-State                    |
 | Alles weg (Off-Season) | Demo-/Fallback-Daten, Seite bleibt voll (Constitution V) |
 
 ## 8. Tests (Constitution X)

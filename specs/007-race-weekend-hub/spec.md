@@ -12,7 +12,7 @@ Die beiden Frontends sind technisch sauber, aber optisch und inhaltlich ungleich
 - Das **Dashboard** (`apps/dashboard`) ist bereits reich — Standings, Kalender, Ergebnisse mit Flaggen + Countdown, Live-Timing-Tower, Gap-Chart, Wetter, Replay, Architektur-Seite.
 - Der **Predictor** (`apps/predictor`) ist minimal — eine zentrierte Überschrift, CSS-Balken für die Podiumswahrscheinlichkeit und ein SVG-Saison-Chart. Inline-Styles, kaum Kontext.
 
-Für ein Portfolio, das **heraussticht**, muss der Predictor zu einem vollwertigen **Rennwochenende-Cockpit** werden: Wer ein Race-Weekend öffnet, sieht auf einen Blick *wann* gefahren wird, *wo* (Streckenkarte), *bei welchem Wetter*, *wer laut Modell aufs Podium kommt und warum*, *wie es dort historisch lief* — und nach dem Rennen *Vorhersage vs. Realität*. Dashboard und Live-Seite bekommen denselben gehobenen, konsistenten Look (gemeinsames Design-Vokabular, Team-Farben, Bewegung mit Maß).
+Für ein Portfolio, das **heraussticht**, muss der Predictor zu einem vollwertigen **Rennwochenende-Cockpit** werden: Wer ein Race-Weekend öffnet, sieht auf einen Blick _wann_ gefahren wird, _wo_ (Streckenkarte), _bei welchem Wetter_, _wer laut Modell aufs Podium kommt und warum_, _wie es dort historisch lief_ — und nach dem Rennen _Vorhersage vs. Realität_. Dashboard und Live-Seite bekommen denselben gehobenen, konsistenten Look (gemeinsames Design-Vokabular, Team-Farben, Bewegung mit Maß).
 
 Alles aus **kostenlosen** Quellen, die schon im Projekt sind (Jolpica/Ergast, OpenF1, die eigene Read-API) plus eine freie Wetter-API und freie Streckengeometrie — **kein neuer AWS-Service, keine laufenden Kosten** (Constitution IV).
 
@@ -47,13 +47,13 @@ EARS-Stil, beobachtbar/prüfbar.
 
 ## Free data sources (kein API-Key, kostenlos)
 
-| Quelle | Liefert | Einsatz | CORS |
-| --- | --- | --- | --- |
-| **Jolpica/Ergast** (`api.jolpi.ca`) | Schedule, Standings, Ergebnisse, Quali, Strecken-Historie | bereits genutzt; Server-seitig (kein CORS) | nein → server-side |
-| **OpenF1** (`api.openf1.org`) | `/sessions` (Zeiten), `/weather`, `/position` live, Fahrer | Timeline, Live-Wetter, Live-Positionen | ja → client-seitig nur während Session |
-| **Open-Meteo** (`api.open-meteo.com`) | Wettervorhersage nach Lat/Lon | Renntag-Forecast | ja |
-| **f1-circuits GeoJSON** (öffentliches Repo, ODbL) | echte Streckengeometrie (Lon/Lat-Linien) | Streckenkarte; **build-/server-seitig gefetcht + gecacht**, attribuiert | — |
-| **eigene Read-API** (Phase 4/5) | Predictions + Saison-Evaluations | bestehend | konfiguriert |
+| Quelle                                            | Liefert                                                    | Einsatz                                                                 | CORS                                   |
+| ------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------- |
+| **Jolpica/Ergast** (`api.jolpi.ca`)               | Schedule, Standings, Ergebnisse, Quali, Strecken-Historie  | bereits genutzt; Server-seitig (kein CORS)                              | nein → server-side                     |
+| **OpenF1** (`api.openf1.org`)                     | `/sessions` (Zeiten), `/weather`, `/position` live, Fahrer | Timeline, Live-Wetter, Live-Positionen                                  | ja → client-seitig nur während Session |
+| **Open-Meteo** (`api.open-meteo.com`)             | Wettervorhersage nach Lat/Lon                              | Renntag-Forecast                                                        | ja                                     |
+| **f1-circuits GeoJSON** (öffentliches Repo, ODbL) | echte Streckengeometrie (Lon/Lat-Linien)                   | Streckenkarte; **build-/server-seitig gefetcht + gecacht**, attribuiert | —                                      |
+| **eigene Read-API** (Phase 4/5)                   | Predictions + Saison-Evaluations                           | bestehend                                                               | konfiguriert                           |
 
 ## Out of Scope
 

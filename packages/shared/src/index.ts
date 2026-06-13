@@ -1,6 +1,7 @@
 export * from "./bedrock-prompts.js";
 export * from "./connections-keys.js";
 export * from "./ddb-keys.js";
+export * from "./evaluation-schema.js";
 export * from "./event-schema.js";
 export * from "./openf1-schema.js";
 export * from "./prediction-schema.js";

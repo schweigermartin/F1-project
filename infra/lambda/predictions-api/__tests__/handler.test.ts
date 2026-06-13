@@ -1,8 +1,9 @@
-import { racePK } from "@f1/shared";
+import { evalSK, EVALUATION_SK, racePK, seasonPK } from "@f1/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   getRacePredictions,
+  getSeasonEvaluations,
   InvalidQueryError,
   RaceNotFoundError,
   type ReadApiDeps,
@@ -106,5 +107,76 @@ describe("getRacePredictions", () => {
     const { deps } = makeDeps([predictionRow(1, "VER", 0.9), predictionRow(16, "LEC", 0.5)]);
     await getRacePredictions({ race_date: RACE_DATE, round: "7" }, { ...deps, emitMetric });
     expect(emitMetric).toHaveBeenCalledWith("PredictionsServed", 2);
+  });
+
+  it("ignores the Phase-5 evaluation row (regression — race mode unchanged)", async () => {
+    const { deps } = makeDeps([
+      predictionRow(1, "VER", 0.9),
+      { PK: racePK(RACE_DATE, ROUND), SK: EVALUATION_SK, top3_hit_rate: 1 },
+    ]);
+    const res = await getRacePredictions({ race_date: RACE_DATE, round: "7" }, deps);
+    expect(res.drivers).toHaveLength(1);
+  });
+});
+
+function evaluationRow(round: number, hitRate: number): Record<string, unknown> {
+  return {
+    PK: seasonPK(2026),
+    SK: evalSK(round),
+    race_date: "2026-06-07",
+    round,
+    season: 2026,
+    model_version: "0.2.0",
+    n_drivers: 20,
+    top3_hit_rate: hitRate,
+    brier_score: 0.12,
+    predicted_top3: [
+      { driver_number: 1, driver_code: "VER", podium_probability: 0.8 },
+      { driver_number: 4, driver_code: "NOR", podium_probability: 0.7 },
+      { driver_number: 16, driver_code: "LEC", podium_probability: 0.5 },
+    ],
+    actual_top3: [
+      { driver_number: 1, driver_code: "VER", position: 1 },
+      { driver_number: 81, driver_code: null, position: 2 },
+      { driver_number: 4, driver_code: "NOR", position: 3 },
+    ],
+    evaluated_at: "2026-06-07T16:45:00+00:00",
+  };
+}
+
+describe("getSeasonEvaluations (Phase 5)", () => {
+  it("returns the season's evaluations sorted by round", async () => {
+    const { deps, queryRace } = makeDeps([evaluationRow(9, 1), evaluationRow(2, 1 / 3)]);
+    const res = await getSeasonEvaluations({ season: "2026" }, deps);
+    expect(queryRace).toHaveBeenCalledWith(seasonPK(2026));
+    expect(res.schema_version).toBe(1);
+    expect(res.season).toBe(2026);
+    expect(res.races.map((r) => r.round)).toEqual([2, 9]);
+  });
+
+  it("returns an empty races array for a season without evaluations (200, not 404)", async () => {
+    const { deps } = makeDeps([]);
+    const res = await getSeasonEvaluations({ season: "2026" }, deps);
+    expect(res.races).toEqual([]);
+  });
+
+  it("throws InvalidQueryError on a non-year season", async () => {
+    const { deps } = makeDeps([]);
+    await expect(getSeasonEvaluations({ season: "soon" }, deps)).rejects.toBeInstanceOf(
+      InvalidQueryError,
+    );
+  });
+
+  it("fails loudly when a stored evaluation row drifted from the schema", async () => {
+    const drifted = { ...evaluationRow(2, 0.5), brier_score: "low" };
+    const { deps } = makeDeps([drifted]);
+    await expect(getSeasonEvaluations({ season: "2026" }, deps)).rejects.toThrow();
+  });
+
+  it("emits an EvaluationsServed metric with the race count", async () => {
+    const emitMetric = vi.fn();
+    const { deps } = makeDeps([evaluationRow(2, 1)]);
+    await getSeasonEvaluations({ season: "2026" }, { ...deps, emitMetric });
+    expect(emitMetric).toHaveBeenCalledWith("EvaluationsServed", 1);
   });
 });

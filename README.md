@@ -56,8 +56,10 @@ Zwei zusammenhängende Systeme, die eine gemeinsame Datenpipeline teilen:
                            │                            │ history.csv  │
                            │                            │ in S3        │
                            │                            └──────┬───────┘
-                           │ predictions + actuals             │
-                           │ (Feedback Loop, Phase 5)          │
+                           │ Feedback Loop ✅ (Phase 5):       │
+                           │ Archiver-Event → F1-Evaluation λ  │
+                           │ S3-Archiv vs. F1Predictions       │
+                           │ → Hit-Rate/Brier → Saison-Chart   │
                            │                                   ▼
                            │                            ┌──────────────┐
                            └──────────────────────────▶ │  Inference   │ ✅ F1-Inference
@@ -84,8 +86,20 @@ Querschnitt (alle Phasen):
 - Geteilte Typen: packages/shared (Zod)     ✅ S3-Pfade + 6 OpenF1-Schemas + DDB-Keys
 - CI: GitHub Actions (lint+typecheck+test)  ✅ grün auf main
 - Cost-Guards: AWS Budget 5 USD/Monat       ✅ aktiv (50%/100% Alarme)
-- Observability: CloudWatch Dashboards      ✅ f1-pipeline + f1-realtime + f1-inference, 11 Alarme via SNS
+- Observability: CloudWatch Dashboards      ✅ f1-pipeline + f1-realtime + f1-inference, 13 Alarme via SNS
 ```
+
+## Feedback Loop (Phase 5)
+
+Der Schritt, der aus zwei Projekten **ein System** macht: Nach jedem Rennen
+meldet der Archiver die konsolidierte Session per EventBridge-Event, die
+`F1-Evaluation`-λ vergleicht die Pre-Race-Vorhersagen (`F1Predictions`) mit dem
+tatsächlichen Ergebnis aus dem **eigenen S3-Archiv** (letzter Position-Tick pro
+Fahrer — keine neue externe Datenquelle) und persistiert Top-3-Trefferquote +
+Brier Score pro Rennen. Das Predictor-Frontend zeigt daraus einen
+Saison-Performance-Chart; wird das Modell schlechter, greift das manuelle
+Re-Training-Runbook ([docs/retraining-runbook.md](docs/retraining-runbook.md))
+mit Roll-out-Gate und explizitem Version-Flip — wie in Phase 6 erprobt.
 
 ## Spec-Driven Development
 
@@ -111,7 +125,7 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 | 2   | [Live Dashboard](specs/002-dashboard/spec.md)                          | ✅ deployed | F1-Realtime-Stack (WebSocket-API, 5 λ, HMAC-Auth) + Next.js/visx-Frontend live auf Vercel                                                                                                                      |
 | 3   | [ML Model](specs/003-ml-model/spec.md)                                 | ✅ done     | XGBoost-Podium-Classifier (ROC-AUC 0.93 · Log-Loss 0.28, Test 2025) + SHAP, Artefakt `models/0.1.0/` in S3                                                                                                     |
 | 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md)             | ✅ deployed | F1-Inference-Stack (Docker-λ: XGBoost + Bedrock/Claude Haiku 4.5, T-60min-Trigger) + Read-API + Predictor-Frontend live auf Vercel                                                                             |
-| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)                       | stub        | Hit-Rate-Tracking + optional Re-Training                                                                                                                                                                       |
+| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)                       | ✅ deployed | Evaluation-λ (Archiver-Event → Vorhersage vs. S3-Archiv → Hit-Rate/Brier in DDB) + Saison-Chart im Predictor + Re-Training-Runbook; live in eu-central-1, ≥3 ausgewertete Rennen akkumulieren über die Saison  |
 | 6   | [Quali + Practice Features](specs/006-quali-practice-features/spec.md) | ✅ deployed | Modell `0.2.0` (6 → 12 Features: Quali-Segment/Grid-Delta/Teammate-Gap + Practice-Pace/Long-Run/Laps), Roll-out-Gate vs `0.1.0` bestanden (ROC-AUC 0.938 · Log-Loss 0.283, Test 2025), live in der Inference-λ |
 
 ## Stack

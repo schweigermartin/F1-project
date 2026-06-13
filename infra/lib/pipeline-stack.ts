@@ -114,7 +114,9 @@ export class PipelineStack extends Stack {
       handler: "handler",
       ...lambdaDefaults,
       memorySize: 256,
-      timeout: Duration.seconds(10),
+      // One invocation = one minute of 5s ticks (POLL_WINDOW_MS 55s — the
+      // scheduler can't fire sub-minute); 75s leaves margin for the last tick.
+      timeout: Duration.seconds(75),
       environment: { EVENTS_QUEUE_URL: this.eventsQueue.queueUrl },
     });
     this.eventsQueue.grantSendMessages(this.pollerFn);
@@ -143,7 +145,7 @@ export class PipelineStack extends Stack {
     this.dataBucket.grantPut(this.consumerFn, "raw/sessions/*/parts/*");
 
     // ─── Archiver λ ───────────────────────────────────────────────────────
-    this.archiverFn = new NodejsFunction(this, "ArchiverFn", {
+    const archiverFn = new NodejsFunction(this, "ArchiverFn", {
       functionName: "F1-Archiver",
       entry: path.join(lambdaDir("archiver"), "index.ts"),
       handler: "handler",
@@ -152,12 +154,28 @@ export class PipelineStack extends Stack {
       timeout: Duration.minutes(5),
       environment: { DATA_BUCKET_NAME: this.dataBucket.bucketName },
     });
+    this.archiverFn = archiverFn;
     this.dataBucket.grantReadWrite(this.archiverFn, "raw/sessions/*");
     this.dataBucket.grantDelete(this.archiverFn, "raw/sessions/*/parts/*");
     new events.Rule(this, "ArchiverSchedule", {
       schedule: events.Schedule.rate(Duration.minutes(15)),
       targets: [new targets.LambdaFunction(this.archiverFn)],
     });
+    // Phase 5 (AC-1): the archiver announces each consolidated session on the
+    // default event bus (SessionArchived → Evaluation λ in InferenceStack).
+    archiverFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["events:PutEvents"],
+        resources: [
+          Stack.of(this).formatArn({
+            service: "events",
+            resource: "event-bus",
+            resourceName: "default",
+            arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
+          }),
+        ],
+      }),
+    );
 
     // ─── Schedule-Sync λ ─────────────────────────────────────────────────
     // Scheduler-invoke role: aws-scheduler assumes this to invoke the Poller.
@@ -302,6 +320,26 @@ export class PipelineStack extends Stack {
         period: Duration.minutes(5),
       }),
       threshold: 5,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
+    // Archiver notify failures (Phase 5): a lost SessionArchived event means a
+    // race silently never gets evaluated — the archive run stays green by
+    // design (best-effort notify), so the structured error log line is the
+    // only signal. Metric filter + alarm make it page instead.
+    const notifyFailuresMetric = new logs.MetricFilter(this, "ArchiverNotifyFailuresFilter", {
+      logGroup: archiverFn.logGroup,
+      filterPattern: logs.FilterPattern.stringValue("$.msg", "=", "archiver.notify_failed"),
+      metricNamespace: "F1/Pipeline",
+      metricName: "ArchiverNotifyFailures",
+      metricValue: "1",
+    }).metric({ period: Duration.minutes(15), statistic: "Sum" });
+    new cloudwatch.Alarm(this, "ArchiverNotifyFailuresAlarm", {
+      alarmName: "F1-Archiver-NotifyFailures",
+      metric: notifyFailuresMetric,
+      threshold: 0,
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
       evaluationPeriods: 1,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,

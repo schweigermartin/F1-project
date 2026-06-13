@@ -30,6 +30,15 @@ export interface ArchiverDeps {
   deleteObjects: (keys: string[]) => Promise<void>;
   /** Sessions whose parts folders to consider. Discovery is caller's job. */
   listActiveSessionFolders: () => Promise<Array<{ date: string; session_id: string }>>;
+  /**
+   * Phase 5 (AC-1): announce a consolidated session on the event bus so the
+   * Evaluation lambda can score the race. Best-effort — a failure must not
+   * fail the archive run (the archive itself is durable, and a retried run
+   * would skip the session as `skippedExisting` without re-notifying anyway);
+   * it is surfaced via the ArchiverNotifyFailures metric/alarm instead, and
+   * the evaluation can be re-triggered manually (see retraining runbook).
+   */
+  notifySessionArchived: (date: string, session_id: string) => Promise<void>;
   now: () => Date;
   emitMetric: (name: string, value: number, dimensions?: Record<string, string>) => void;
 }
@@ -103,6 +112,12 @@ export async function archive(deps: ArchiverDeps): Promise<ArchiverResult> {
 
     result.consolidated.push({ date, session_id, rows: collected.length, parts: parts.length });
     deps.emitMetric("SessionsArchived", 1, { session_id });
+
+    try {
+      await deps.notifySessionArchived(date, session_id);
+    } catch {
+      deps.emitMetric("ArchiverNotifyFailures", 1, { session_id });
+    }
   }
 
   return result;

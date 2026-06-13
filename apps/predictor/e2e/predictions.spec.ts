@@ -32,4 +32,9 @@ test("loads, lists drivers sorted by podium probability, click opens the reason"
   await expect(top).toHaveAttribute("aria-expanded", "true");
   // The seeded top driver (LEC) carries a known explanation sentence.
   await expect(page.getByText(/Souveräne Pole-Position/)).toBeVisible();
+
+  // Phase 5 (AC-3): the season-performance chart renders below the board —
+  // in demo mode with three seeded evaluations, against a deployed preview
+  // possibly as its empty state; either way the section must be there.
+  await expect(page.getByRole("heading", { name: "Saison-Performance" })).toBeVisible();
 });

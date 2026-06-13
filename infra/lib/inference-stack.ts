@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PK_ATTR, SK_ATTR } from "@f1/shared";
+import { ARCHIVER_EVENT_SOURCE, PK_ATTR, SESSION_ARCHIVED_DETAIL_TYPE, SK_ATTR } from "@f1/shared";
 import {
   CfnOutput,
   Duration,
@@ -15,6 +15,8 @@ import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as cwActions from "aws-cdk-lib/aws-cloudwatch-actions";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
+import * as events from "aws-cdk-lib/aws-events";
+import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
@@ -38,6 +40,10 @@ const CLAUDE_HAIKU_FM_PATTERN = "anthropic.claude-haiku-4-5-*";
 /** EMF namespace the inference λ writes its custom metrics under. Mirrors
  * `_METRIC_NAMESPACE` in infra/lambda/inference/lambda_function.py — keep in sync. */
 const METRIC_NAMESPACE = "F1/Inference";
+
+/** EMF namespace of the evaluation λ (Phase 5). Mirrors the literal in
+ * infra/lambda/evaluation/index.ts — keep in sync. */
+const EVALUATION_METRIC_NAMESPACE = "F1/Evaluation";
 
 /** Known names so PipelineStack's schedule-sync can build the ARNs without a
  * cross-stack reference (which would create a Pipeline↔Inference cycle). */
@@ -74,6 +80,7 @@ export class InferenceStack extends Stack {
   readonly schedulerInvokeRole: iam.Role;
   readonly readApiFn: lambda.Function;
   readonly readApiUrl: lambda.FunctionUrl;
+  readonly evaluationFn: lambda.Function;
 
   constructor(scope: Construct, id: string, props: InferenceStackProps) {
     super(scope, id, props);
@@ -210,8 +217,69 @@ export class InferenceStack extends Stack {
     this.readApiFn = fn;
     this.readApiUrl = url;
 
+    // ─── Evaluation λ (Phase 5 — feedback loop) ───────────────────────────
+    this.evaluationFn = this.addEvaluation(props.dataBucket);
+
     // ─── Alarms + dashboard (Constitution VIII) ───────────────────────────
     this.addMonitoring(props.alertTopic);
+  }
+
+  /**
+   * Phase-5 feedback loop: fired by the Archiver's SessionArchived event, it
+   * scores a race's predictions against the archived result and writes the
+   * evaluation back into F1Predictions (race PK + season PK). Lives in this
+   * stack on purpose — everything that reads/writes F1Predictions stays in
+   * one place, and the feedback widgets extend the existing f1-inference
+   * dashboard (a 4th dashboard would leave the CloudWatch free tier,
+   * Constitution IV). No DLQ on the rule: a failed run pages via the error
+   * alarm and a manual re-run is idempotent (see retraining runbook).
+   */
+  private addEvaluation(dataBucket: IBucket): lambda.Function {
+    const fn = new NodejsFunction(this, "EvaluationFn", {
+      functionName: "F1-Evaluation",
+      entry: path.join(lambdaDir("evaluation"), "index.ts"),
+      handler: "handler",
+      runtime: lambda.Runtime.NODEJS_20_X,
+      architecture: lambda.Architecture.ARM_64,
+      logRetention: logs.RetentionDays.TWO_WEEKS,
+      // A full race archive is a few MB of JSONL; parsing it line-by-line is
+      // memory-light but give it headroom + time for S3/OpenF1 round trips.
+      memorySize: 512,
+      timeout: Duration.minutes(2),
+      bundling: {
+        format: OutputFormat.ESM,
+        target: "node20",
+        externalModules: ["@aws-sdk/*"],
+      },
+      environment: {
+        PREDICTIONS_TABLE: this.predictionsTable.tableName,
+        DATA_BUCKET_NAME: dataBucket.bucketName,
+      },
+    });
+    // The stack is tagged Phase 4; the feedback-loop constructs override to 5
+    // so the cost/audit tags attribute them correctly (Constitution III).
+    Tags.of(fn).add("Phase", "5");
+
+    // Least privilege (Constitution VII): read only the session archive, and
+    // exactly Query (predictions in) + PutItem (evaluation out) on the table.
+    dataBucket.grantRead(fn, "raw/sessions/*");
+    fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:Query", "dynamodb:PutItem"],
+        resources: [this.predictionsTable.tableArn],
+      }),
+    );
+
+    new events.Rule(this, "SessionArchivedRule", {
+      description: "Archiver finished consolidating a session → evaluate it (Phase 5, AC-1).",
+      eventPattern: {
+        source: [ARCHIVER_EVENT_SOURCE],
+        detailType: [SESSION_ARCHIVED_DETAIL_TYPE],
+      },
+      targets: [new targets.LambdaFunction(fn)],
+    });
+
+    return fn;
   }
 
   /**
@@ -338,6 +406,18 @@ export class InferenceStack extends Stack {
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     }).addAlarmAction(alertAction);
 
+    // 5. Evaluation errors (Phase 5, AC-6) — a failed run means a race never
+    // gets its hit-rate; the run is idempotent, so after the fix a manual
+    // re-invoke recovers it (runbook).
+    new cloudwatch.Alarm(this, "EvaluationErrorsAlarm", {
+      alarmName: "F1-Evaluation-Errors",
+      metric: this.evaluationFn.metricErrors({ period: Duration.minutes(15) }),
+      threshold: 0,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
     new cloudwatch.Dashboard(this, "InferenceDashboard", {
       dashboardName: "f1-inference",
       widgets: [
@@ -370,7 +450,37 @@ export class InferenceStack extends Stack {
             width: 12,
           }),
         ],
+        // Phase-5 feedback loop: model quality over the season + eval health.
+        [
+          new cloudwatch.GraphWidget({
+            title: "Model quality per race (hit-rate / brier)",
+            left: [this.evaluationMetric("EvaluationHitRate")],
+            right: [this.evaluationMetric("EvaluationBrier")],
+            width: 12,
+          }),
+          new cloudwatch.GraphWidget({
+            title: "Evaluation runs vs errors vs skips",
+            left: [
+              this.evaluationFn.metricInvocations(),
+              this.evaluationMetric("EvaluationSkippedNoPredictions"),
+            ],
+            right: [this.evaluationFn.metricErrors({ color: cloudwatch.Color.RED })],
+            width: 12,
+          }),
+        ],
       ],
+    });
+  }
+
+  /** One EMF metric of the evaluation λ (namespace F1/Evaluation). Maximum
+   * because hit-rate/brier are per-race values, not counters; the λ runs
+   * ~24×/year so any aggregate over a period sees at most one sample. */
+  private evaluationMetric(metricName: string): cloudwatch.Metric {
+    return new cloudwatch.Metric({
+      namespace: EVALUATION_METRIC_NAMESPACE,
+      metricName,
+      statistic: "Maximum",
+      period: Duration.minutes(15),
     });
   }
 }

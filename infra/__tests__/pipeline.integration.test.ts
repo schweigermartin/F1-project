@@ -118,6 +118,7 @@ describe("Pipeline integration — fixtures → DDB + S3 part → archive", () =
     // ── Stage 3: Archiver consolidates the parts (30+ min later) ─────────
     const ARCHIVE_NOW = new Date(NOW.getTime() + 45 * 60 * 1000);
     const partLastModified = NOW;
+    const archivedNotifications: Array<{ date: string; sessionId: string }> = [];
     const archiveResult = await archive({
       listActiveSessionFolders: async () => [{ date: "2026-05-24", session_id: "11291" }],
       listParts: async (prefix): Promise<PartObject[]> => {
@@ -137,6 +138,9 @@ describe("Pipeline integration — fixtures → DDB + S3 part → archive", () =
       deleteObjects: async (keys) => {
         for (const k of keys) s3.delete(k);
       },
+      notifySessionArchived: async (date, sessionId) => {
+        archivedNotifications.push({ date, sessionId });
+      },
       now: () => ARCHIVE_NOW,
       emitMetric: () => {},
     });
@@ -144,6 +148,8 @@ describe("Pipeline integration — fixtures → DDB + S3 part → archive", () =
     expect(archiveResult.consolidated).toEqual([
       { date: "2026-05-24", session_id: "11291", rows: 5, parts: 1 },
     ]);
+    // Phase 5: the consolidated session was announced exactly once (AC-1).
+    expect(archivedNotifications).toEqual([{ date: "2026-05-24", sessionId: "11291" }]);
     // Final file present, parts gone.
     expect(s3.has("raw/sessions/2026-05-24/11291.jsonl")).toBe(true);
     expect([...s3.keys()].filter((k) => k.includes("/parts/"))).toHaveLength(0);

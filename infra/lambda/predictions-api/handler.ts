@@ -5,7 +5,12 @@ import {
   PredictionApiResponseSchema,
   type PredictionItem,
   PredictionItemSchema,
+  RaceEvaluationSchema,
   racePK,
+  SEASON_API_SCHEMA_VERSION,
+  type SeasonEvaluationResponse,
+  SeasonEvaluationResponseSchema,
+  seasonPK,
 } from "@f1/shared";
 import { z } from "zod";
 
@@ -104,4 +109,42 @@ export async function getRacePredictions(
     model_version,
     drivers,
   } satisfies PredictionApiResponse);
+}
+
+/** Query string of the Phase-5 season mode (`?season=2026`). */
+const SeasonQuerySchema = z.object({
+  season: z.coerce.number().int().min(2023).max(2100),
+});
+
+const EVAL_SK_PREFIX = "eval#";
+
+/**
+ * Season mode (Phase 5, AC-3): every evaluated race of a season from the
+ * `season#<year>` partition, sorted by round. An empty season returns
+ * `races: []` with HTTP 200 — "nothing evaluated yet" is a normal state the
+ * frontend renders as an empty chart, not an error.
+ */
+export async function getSeasonEvaluations(
+  rawQuery: Record<string, string | undefined> | null,
+  deps: ReadApiDeps,
+): Promise<SeasonEvaluationResponse> {
+  const parsed = SeasonQuerySchema.safeParse(rawQuery ?? {});
+  if (!parsed.success) {
+    throw new InvalidQueryError(parsed.error.issues.map((i) => i.message).join("; "));
+  }
+  const { season } = parsed.data;
+
+  const items = await deps.queryRace(seasonPK(season));
+  const races = items
+    .filter((i) => typeof i["SK"] === "string" && i["SK"].startsWith(EVAL_SK_PREFIX))
+    .map((i) => RaceEvaluationSchema.parse(i))
+    .sort((a, b) => a.round - b.round);
+
+  deps.emitMetric?.("EvaluationsServed", races.length);
+
+  return SeasonEvaluationResponseSchema.parse({
+    schema_version: SEASON_API_SCHEMA_VERSION,
+    season,
+    races,
+  } satisfies SeasonEvaluationResponse);
 }

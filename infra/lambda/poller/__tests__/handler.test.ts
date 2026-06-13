@@ -6,6 +6,7 @@ import {
   type PollerDeps,
   type PollerEvent,
   pollOnce,
+  pollSession,
   shouldPollWeather,
 } from "../handler.js";
 
@@ -310,5 +311,60 @@ describe("pollOnce — network errors", () => {
     expect(summary.http_failures).toBe(summary.attempted);
     expect(sleep).not.toHaveBeenCalled();
     expect(sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe("pollSession — one minute of 5s ticks (scheduler can't fire sub-minute)", () => {
+  /** Virtual clock: now() reads it, sleep() advances it — no real waiting. */
+  function makeClockedMocks(start = Date.parse("2026-05-24T20:30:00.000Z")): Mocks & {
+    clock: () => number;
+  } {
+    let clock = start;
+    const m = makeMocks({});
+    m.deps.now = () => new Date(clock);
+    const sleep = vi.fn(async (ms: number) => {
+      clock += ms;
+    });
+    m.deps.sleep = sleep;
+    m.sleep = sleep;
+    return { ...m, deps: m.deps, clock: () => clock };
+  }
+
+  it("ticks every 5s until the 55s window is full (11 snapshots)", async () => {
+    const m = makeClockedMocks();
+    const summaries = await pollSession(evt, m.deps);
+    expect(summaries).toHaveLength(11); // t = 0, 5, …, 50s
+    // Instant ticks → every wait is the full 5s interval.
+    expect(m.sleep).toHaveBeenCalledTimes(10);
+    expect(m.sleep).toHaveBeenLastCalledWith(5000);
+  });
+
+  it("a window smaller than one interval still produces exactly one snapshot", async () => {
+    const m = makeClockedMocks();
+    const summaries = await pollSession(evt, m.deps, 1000);
+    expect(summaries).toHaveLength(1);
+    expect(m.sleep).not.toHaveBeenCalled();
+  });
+
+  it("a slow tick eats into the window instead of overrunning it", async () => {
+    const m = makeClockedMocks();
+    let clockBump = 0;
+    // First send of each tick simulates 7s of real latency (slower than the
+    // 5s interval): the loop must skip the sleep and still end on time.
+    const origNow = m.deps.now;
+    m.deps.sendMessage = vi.fn(async () => {
+      if (clockBump < 2) {
+        clockBump += 1;
+        await m.deps.sleep(7000);
+      }
+    });
+    void origNow;
+    const summaries = await pollSession(evt, m.deps, 20_000);
+    // Ticks start at t=0 (runs until 7s), next due at 5s → immediate at 7s,
+    // (runs until 14s), next due at 12s → immediate, then instant ticks every
+    // 5s until t ≥ 20s.
+    const lastTickWithinWindow = m.clock() <= Date.parse("2026-05-24T20:30:00.000Z") + 27_000;
+    expect(lastTickWithinWindow).toBe(true);
+    expect(summaries.length).toBeGreaterThanOrEqual(3);
   });
 });

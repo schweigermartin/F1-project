@@ -1,0 +1,72 @@
+.section {
+  max-width: 720px;
+  margin: 2.5rem auto 0;
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.sub {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.legend {
+  display: flex;
+  gap: 1rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.legendHit::before,
+.legendBrier::before {
+  content: "";
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.18rem;
+  border-radius: 2px;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+}
+
+.legendHit::before {
+  background: #4ade80;
+}
+
+.legendBrier::before {
+  background: #f59e0b;
+}
+
+.chartWrap {
+  border: 1px solid #1f2733;
+  border-radius: 8px;
+  background: #11161f;
+  padding: 0.75rem;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.empty {
+  border: 1px dashed #2a3242;
+  border-radius: 8px;
+  padding: 1rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}

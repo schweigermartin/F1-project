@@ -72,10 +72,16 @@ function isRace(session: Session): boolean {
   return session.session_name === "Race";
 }
 
-/** Championship round = this race's 1-based position among the season's races. */
+/**
+ * Championship round = this race's 1-based position among the season's
+ * NON-CANCELLED races. Cancelled races must not count: the official numbering
+ * (Jolpica, which the predictor frontend queries by) skips them, and the
+ * Phase-5 evaluation λ derives the same round to find these predictions again
+ * — counting a cancelled race would shift every later round and orphan both.
+ */
 function raceRound(session: Session, allValidated: Session[]): number {
   const races = allValidated
-    .filter(isRace)
+    .filter((s) => isRace(s) && !s.is_cancelled)
     .sort((a, b) => new Date(a.date_start).getTime() - new Date(b.date_start).getTime());
   return races.findIndex((r) => r.session_key === session.session_key) + 1;
 }

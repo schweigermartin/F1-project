@@ -1,7 +1,7 @@
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import type { ScheduledEvent } from "aws-lambda";
 
-import { type PollerEvent, pollOnce } from "./handler.js";
+import { type PollerEvent, pollSession } from "./handler.js";
 
 const QUEUE_URL = process.env["EVENTS_QUEUE_URL"];
 if (!QUEUE_URL) throw new Error("EVENTS_QUEUE_URL env var not set");
@@ -21,7 +21,9 @@ export async function handler(
 
   const metrics: Array<{ name: string; value: number; dim?: Record<string, string> }> = [];
 
-  const summary = await pollOnce(
+  // One scheduler firing (rate(1 minute)) = one minute of 5s snapshots — the
+  // scheduler can't fire sub-minute, so the loop lives here (handler.ts).
+  const summaries = await pollSession(
     { session_key: sessionKey },
     {
       fetch: globalThis.fetch.bind(globalThis),
@@ -34,8 +36,18 @@ export async function handler(
     },
   );
 
+  const http_failures = summaries.reduce((n, s) => n + s.http_failures, 0);
+  const schema_failures = summaries.reduce((n, s) => n + s.schema_failures, 0);
   // Single JSON line per invocation — picked up by CloudWatch Logs Insights
   // and parsed by the alarms we add in T13.
-  console.log(JSON.stringify({ level: "info", msg: "poller.tick", summary, metrics }));
-  return { ok: summary.http_failures === 0 && summary.schema_failures === 0, summary };
+  console.log(
+    JSON.stringify({
+      level: "info",
+      msg: "poller.tick",
+      ticks: summaries.length,
+      summaries,
+      metrics,
+    }),
+  );
+  return { ok: http_failures === 0 && schema_failures === 0, summary: summaries };
 }

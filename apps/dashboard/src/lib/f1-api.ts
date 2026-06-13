@@ -261,3 +261,83 @@ export function pickNextRace(races: RaceMeta[], now: Date): RaceMeta | null {
     .sort((a, b) => a.date.localeCompare(b.date));
   return upcoming[0] ?? null;
 }
+
+// ─── Per-round results (Phase 8: Season Explorer) ────────────────────────────
+
+/**
+ * Full race classification for one round (not sliced). Returns `null` if the
+ * race hasn't happened yet or the source is unreachable — the explorer then
+ * shows a friendly "not available" note (Constitution V/VI).
+ */
+export async function getRaceResults(
+  season: number,
+  round: number,
+): Promise<RaceResultRow[] | null> {
+  const data = await fetchJolpica(`${season}/${round}/results/?format=json`, resultsEnvelope);
+  const race = data?.MRData.RaceTable.Races[0];
+  if (!race) return null;
+  return race.Results.map((r) => ({
+    position: Number(r.position),
+    driver: `${r.Driver.givenName} ${r.Driver.familyName}`,
+    code: r.Driver.code ?? r.Driver.familyName.slice(0, 3).toUpperCase(),
+    constructor: r.Constructor.name,
+    points: r.points,
+    ...(r.grid ? { grid: r.grid } : {}),
+    result: r.Time?.time ?? r.status ?? "—",
+    ...(r.Driver.nationality ? { nationality: r.Driver.nationality } : {}),
+  }));
+}
+
+const qualifyingEnvelope = z.object({
+  MRData: z.object({
+    RaceTable: z.object({
+      Races: z.array(
+        z.object({
+          QualifyingResults: z.array(
+            z.object({
+              position: z.string(),
+              Driver: DriverSchema,
+              Constructor: ConstructorSchema,
+              Q1: z.string().optional(),
+              Q2: z.string().optional(),
+              Q3: z.string().optional(),
+            }),
+          ),
+        }),
+      ),
+    }),
+  }),
+});
+
+export interface QualiRow {
+  position: number;
+  driver: string;
+  code: string;
+  constructor: string;
+  q1?: string;
+  q2?: string;
+  q3?: string;
+  /** Best of Q3/Q2/Q1 — the lap that set the grid slot. */
+  best: string;
+  nationality?: string;
+}
+
+export async function getQualifyingResults(
+  season: number,
+  round: number,
+): Promise<QualiRow[] | null> {
+  const data = await fetchJolpica(`${season}/${round}/qualifying/?format=json`, qualifyingEnvelope);
+  const results = data?.MRData.RaceTable.Races[0]?.QualifyingResults;
+  if (!results || results.length === 0) return null;
+  return results.map((r) => ({
+    position: Number(r.position),
+    driver: `${r.Driver.givenName} ${r.Driver.familyName}`,
+    code: r.Driver.code ?? r.Driver.familyName.slice(0, 3).toUpperCase(),
+    constructor: r.Constructor.name,
+    ...(r.Q1 ? { q1: r.Q1 } : {}),
+    ...(r.Q2 ? { q2: r.Q2 } : {}),
+    ...(r.Q3 ? { q3: r.Q3 } : {}),
+    best: r.Q3 || r.Q2 || r.Q1 || "—",
+    ...(r.Driver.nationality ? { nationality: r.Driver.nationality } : {}),
+  }));
+}

@@ -120,6 +120,17 @@ Sprache. Alles aus **kostenlosen** Quellen, **ohne neuen AWS-Service**.
 - [Open-Meteo](https://open-meteo.com/) — Renntag-Wettervorhersage.
 - Streckengeometrie aus [bacinger/f1-circuits](https://github.com/bacinger/f1-circuits) (ODbL) — server-seitig gefetcht + projiziert.
 
+## Season Explorer (Phase 8)
+
+Die Dashboard-Landing ist ein **interaktiver Season Explorer**: eine sticky Selektor-Leiste
+mit **Renn-Dropdown** (jede Runde der Saison), **Session-Umschalter** (Rennen / Qualifying /
+FP1–FP3) und **Fahrer-Fokus**. Alles läuft über URL-Parameter (`?round=&session=&driver=`) —
+server-gerendert, ISR-gecacht, teilbare Links. Pro Auswahl erscheinen ein hervorgehobenes
+**Podium** und ein **Ergebnis-Board** (Spalten passen sich an: Zeit/Punkte beim Rennen,
+Q1/Q2/Q3 bei der Quali, Bestzeit/Gap im Training), dazu WM-Stände (mit Fokus-Highlight),
+ein klickbarer Kalender und der Countdown zum nächsten GP. Rennen + Qualifying aus Jolpica,
+Practice-Bestzeiten aus OpenF1 — **kein neuer AWS-Service**.
+
 ## Spec-Driven Development
 
 Dieses Projekt folgt SDD (spec-kit-inspiriert). Workflow:
@@ -147,6 +158,7 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 | 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)                       | ✅ deployed | Evaluation-λ (Archiver-Event → Vorhersage vs. S3-Archiv → Hit-Rate/Brier in DDB) + Saison-Chart im Predictor + Re-Training-Runbook; live in eu-central-1, ≥3 ausgewertete Rennen akkumulieren über die Saison                                                                                                                                                                                               |
 | 6   | [Quali + Practice Features](specs/006-quali-practice-features/spec.md) | ✅ deployed | Modell `0.2.0` (6 → 12 Features: Quali-Segment/Grid-Delta/Teammate-Gap + Practice-Pace/Long-Run/Laps), Roll-out-Gate vs `0.1.0` bestanden (ROC-AUC 0.938 · Log-Loss 0.283, Test 2025), live in der Inference-λ                                                                                                                                                                                              |
 | 7   | [Race Weekend Hub](specs/007-race-weekend-hub/spec.md)                 | ✅ deployed | Predictor wird zum Rennwochenende-Cockpit: Session-Timeline + Countdown, interaktive Streckenkarte (animierte Runde), Wetter (Open-Meteo), Podium-Karten in Team-Farben + SHAP-Wasserfall, Grid-vs-Vorhersage, Strecken-Historie, Live-/Ergebnis-Panel (Vorhersage vs. Realität), interaktiver Saison-Chart; gemeinsame Design-Tokens + Team-Farben über alle Frontends. Nur freie APIs, **kein neues AWS** |
+| 8   | [Season Explorer](specs/008-season-explorer/spec.md)                   | ✅ deployed | Dashboard-Landing wird interaktiver Season Explorer: Selektoren für Rennen/Runde, Session (FP/Quali/Race) und Fahrer-Fokus (URL-basiert, teilbar), Podium + adaptives Ergebnis-Board (Jolpica Race/Quali, OpenF1 Practice-Bestzeiten), WM-Fokus-Highlight, klickbarer Kalender. Nur freie APIs, **kein neues AWS**                                                                                          |
 
 ## Stack
 

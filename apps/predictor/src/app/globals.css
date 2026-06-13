@@ -1,9 +1,12 @@
+/*
+ * Base styles for the Race Weekend Hub. Design tokens (colours/spacing/radius/
+ * fonts) are injected into :root by the layout from @f1/shared
+ * (tokensToCssVars) — this file only consumes them via var(--…), so the two
+ * apps share one visual vocabulary (Phase 7, Constitution III).
+ */
+
 :root {
   color-scheme: dark;
-  --bg: #0a0e14;
-  --fg: #e6e6e6;
-  --muted: #8a94a6;
-  --accent: #e10600; /* F1 red */
 }
 
 * {
@@ -14,19 +17,55 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(225, 6, 0, 0.12), transparent 60%), var(--bg);
   color: var(--fg);
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    Helvetica,
-    Arial,
-    sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+a {
+  color: inherit;
 }
 
 main {
-  padding: 2.5rem 1.25rem 4rem;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: var(--space-2xl) var(--space-lg) 4rem;
+}
+
+/* ── Shared primitives ─────────────────────────────────────────────────── */
+
+.card {
+  background: linear-gradient(180deg, var(--surface), var(--bg));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-xl);
+}
+
+.kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* Numeric/monospace tabular figures for times, gaps, percentages. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }

@@ -49,6 +49,31 @@
   background: #f59e0b;
 }
 
+.toggle {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+}
+
+.toggleBtn {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.72rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.toggleActive {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
 .chartWrap {
   border: 1px solid #1f2733;
   border-radius: 8px;

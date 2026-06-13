@@ -1,18 +1,22 @@
+"use client";
+
 import type { RaceEvaluation, SeasonEvaluationResponse } from "@f1/shared";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import styles from "./season.module.css";
 
 /**
- * Saison-Performance chart (Phase 5, AC-3/US-2): top-3 hit-rate and Brier
- * score per evaluated race. Dependency-free inline SVG — ~24 points per
- * season don't justify a chart library (same bias as the CSS prediction
- * bars). Server-renderable: no state, tooltips via native <title>.
+ * Saison-Performance chart (Phase 5 AC-3 / Phase 7 AC-9): top-3 hit-rate and
+ * Brier score per evaluated race. Phase 7 adds a metric toggle and model-
+ * version bands (a dashed marker where the active model changed) on top of the
+ * dependency-free inline SVG. Tooltips stay native <title>. Empty-state kept.
  */
 
 const WIDTH = 720;
-const HEIGHT = 220;
-const PAD = { top: 12, right: 14, bottom: 26, left: 34 };
+const HEIGHT = 240;
+const PAD = { top: 14, right: 14, bottom: 28, left: 34 };
+
+type Metric = "both" | "hit" | "brier";
 
 interface Point {
   x: number;
@@ -21,7 +25,6 @@ interface Point {
   race: RaceEvaluation;
 }
 
-/** Both metrics live on a 0–1 scale, so one shared Y axis works. */
 function yFor(value: number): number {
   const innerH = HEIGHT - PAD.top - PAD.bottom;
   return PAD.top + (1 - value) * innerH;
@@ -29,8 +32,6 @@ function yFor(value: number): number {
 
 function buildPoints(races: RaceEvaluation[]): Point[] {
   const innerW = WIDTH - PAD.left - PAD.right;
-  // X by index, not round number: gaps (skipped races) would otherwise tear
-  // holes into the polyline without adding information.
   const step = races.length > 1 ? innerW / (races.length - 1) : 0;
   return races.map((race, i) => ({
     x: PAD.left + (races.length > 1 ? i * step : innerW / 2),
@@ -44,11 +45,24 @@ function polyline(points: Point[], pick: (p: Point) => number): string {
   return points.map((p) => `${p.x.toFixed(1)},${pick(p).toFixed(1)}`).join(" ");
 }
 
+/** Indices where the model version differs from the previous race → a band. */
+function versionBands(points: Point[]): Array<{ x: number; version: string }> {
+  const bands: Array<{ x: number; version: string }> = [];
+  points.forEach((p, i) => {
+    const prev = points[i - 1];
+    if (prev && prev.race.model_version !== p.race.model_version) {
+      bands.push({ x: (prev.x + p.x) / 2, version: p.race.model_version });
+    }
+  });
+  return bands;
+}
+
 export interface SeasonPerformanceProps {
   response: SeasonEvaluationResponse | null;
 }
 
 export function SeasonPerformance({ response }: SeasonPerformanceProps): ReactNode {
+  const [metric, setMetric] = useState<Metric>("both");
   const races = response?.races ?? [];
 
   return (
@@ -61,9 +75,16 @@ export function SeasonPerformance({ response }: SeasonPerformanceProps): ReactNo
           </p>
         </div>
         {races.length > 0 ? (
-          <div className={styles.legend}>
-            <span className={styles.legendHit}>Top-3-Trefferquote</span>
-            <span className={styles.legendBrier}>Brier Score (kleiner = besser)</span>
+          <div className={styles.toggle} role="group" aria-label="Metrik wählen">
+            <ToggleBtn active={metric === "both"} onClick={() => setMetric("both")}>
+              Beide
+            </ToggleBtn>
+            <ToggleBtn active={metric === "hit"} onClick={() => setMetric("hit")}>
+              Trefferquote
+            </ToggleBtn>
+            <ToggleBtn active={metric === "brier"} onClick={() => setMetric("brier")}>
+              Brier
+            </ToggleBtn>
           </div>
         ) : null}
       </header>
@@ -74,15 +95,38 @@ export function SeasonPerformance({ response }: SeasonPerformanceProps): ReactNo
           Rennen gelaufen und ausgewertet ist.
         </p>
       ) : (
-        <SeasonChart races={races} />
+        <SeasonChart races={races} metric={metric} />
       )}
     </section>
   );
 }
 
-function SeasonChart({ races }: { races: RaceEvaluation[] }): ReactNode {
+function ToggleBtn({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: ReactNode;
+  onClick: () => void;
+}): ReactNode {
+  return (
+    <button
+      type="button"
+      className={`${styles.toggleBtn} ${active ? styles.toggleActive : ""}`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SeasonChart({ races, metric }: { races: RaceEvaluation[]; metric: Metric }): ReactNode {
   const points = buildPoints(races);
   const gridValues = [0, 0.5, 1];
+  const showHit = metric !== "brier";
+  const showBrier = metric !== "hit";
+  const bands = versionBands(points);
 
   return (
     <div className={styles.chartWrap}>
@@ -108,36 +152,69 @@ function SeasonChart({ races }: { races: RaceEvaluation[] }): ReactNode {
           </g>
         ))}
 
+        {/* Model-version bands (Phase 7 AC-9). */}
+        {bands.map((b) => (
+          <g key={`band-${b.x}`}>
+            <line
+              x1={b.x}
+              x2={b.x}
+              y1={PAD.top}
+              y2={HEIGHT - PAD.bottom}
+              stroke="#3a4456"
+              strokeWidth={1}
+              strokeDasharray="3 3"
+            />
+            <text x={b.x + 3} y={PAD.top + 9} fontSize={9} fill="#8a94a6">
+              → v{b.version}
+            </text>
+          </g>
+        ))}
+
         {points.length > 1 ? (
           <>
-            <polyline
-              points={polyline(points, (p) => p.yHit)}
-              fill="none"
-              stroke="#4ade80"
-              strokeWidth={2}
-            />
-            <polyline
-              points={polyline(points, (p) => p.yBrier)}
-              fill="none"
-              stroke="#f59e0b"
-              strokeWidth={2}
-            />
+            {showHit ? (
+              <polyline
+                points={polyline(points, (p) => p.yHit)}
+                fill="none"
+                stroke="#4ade80"
+                strokeWidth={2}
+              />
+            ) : null}
+            {showBrier ? (
+              <polyline
+                points={polyline(points, (p) => p.yBrier)}
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth={2}
+              />
+            ) : null}
           </>
         ) : null}
 
         {points.map((p) => (
           <g key={p.race.round}>
-            <circle cx={p.x} cy={p.yHit} r={4} fill="#4ade80" data-testid="hit-point">
-              <title>
-                {`Runde ${p.race.round} (${p.race.race_date}, Modell v${p.race.model_version}): ` +
-                  `Trefferquote ${(p.race.top3_hit_rate * 100).toFixed(0)} % — ` +
-                  `Podium ${p.race.actual_top3.map((d) => d.driver_code ?? `#${d.driver_number}`).join(", ")}, ` +
-                  `vorhergesagt ${p.race.predicted_top3.map((d) => d.driver_code).join(", ")}`}
-              </title>
-            </circle>
-            <circle cx={p.x} cy={p.yBrier} r={3.5} fill="#f59e0b" data-testid="brier-point">
-              <title>{`Runde ${p.race.round}: Brier Score ${p.race.brier_score.toFixed(3)}`}</title>
-            </circle>
+            {showHit ? (
+              <circle
+                cx={p.x}
+                cy={p.yHit}
+                r={4}
+                fill="#4ade80"
+                data-testid="hit-point"
+                style={{ opacity: 1 }}
+              >
+                <title>
+                  {`Runde ${p.race.round} (${p.race.race_date}, Modell v${p.race.model_version}): ` +
+                    `Trefferquote ${(p.race.top3_hit_rate * 100).toFixed(0)} % — ` +
+                    `Podium ${p.race.actual_top3.map((d) => d.driver_code ?? `#${d.driver_number}`).join(", ")}, ` +
+                    `vorhergesagt ${p.race.predicted_top3.map((d) => d.driver_code).join(", ")}`}
+                </title>
+              </circle>
+            ) : null}
+            {showBrier ? (
+              <circle cx={p.x} cy={p.yBrier} r={3.5} fill="#f59e0b" data-testid="brier-point">
+                <title>{`Runde ${p.race.round}: Brier Score ${p.race.brier_score.toFixed(3)}`}</title>
+              </circle>
+            ) : null}
             <text x={p.x} y={HEIGHT - 8} textAnchor="middle" fontSize={11} fill="#6b7686">
               R{p.race.round}
             </text>

@@ -1,3 +1,4 @@
+import { teamColor } from "@f1/shared";
 import type { ReactNode } from "react";
 
 import type { ConstructorStanding, DriverStanding, LastRace, RaceMeta } from "../../lib/f1-api";
@@ -53,6 +54,22 @@ function Fallback(): ReactNode {
   return <p className={styles.fallback}>Daten gerade nicht verfügbar — später erneut laden.</p>;
 }
 
+/** A small team-colour marker (shared @f1/shared colour map, Phase 7). */
+function TeamDot({ team }: { team: string }): ReactNode {
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: teamColor(team).primary,
+        flex: "none",
+      }}
+    />
+  );
+}
+
 export function NextRaceHero({ race }: { race: RaceMeta | null }): ReactNode {
   if (!race) return null;
   const where = [race.locality, race.country].filter(Boolean).join(", ");
@@ -104,7 +121,12 @@ export function DriverStandingsCard({ rows }: { rows: DriverStanding[] | null })
                     <span className={styles.code}>{r.code}</span>
                   </span>
                 </td>
-                <td className={styles.sub}>{r.constructor}</td>
+                <td className={styles.sub}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                    <TeamDot team={r.constructor} />
+                    {r.constructor}
+                  </span>
+                </td>
                 <td className={styles.num}>{r.wins}</td>
                 <td className={styles.pts}>{r.points}</td>
               </tr>
@@ -142,6 +164,7 @@ export function ConstructorStandingsCard({
                 <td>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
                     <Flag code={nationalityToCode(r.nationality)} title={r.nationality} size={18} />
+                    <TeamDot team={r.name} />
                     <span className={styles.name}>{r.name}</span>
                   </span>
                 </td>

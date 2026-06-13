@@ -1,7 +1,7 @@
 # Spec: Race Weekend Hub & Frontend Overhaul
 
 > **Phase:** 007
-> **Status:** implemented — alle Panels gebaut + getestet (Gate grün, beide Apps bauen, Demo-Smoke grün); Deploy auf Vercel + Merge nach `main` ausstehend (Martin)
+> **Status:** done — alle Panels gebaut + getestet (Gate grün, beide Apps bauen, Smokes grün), merged nach `main` + getaggt `phase-7-done` + gepusht; Vercel deployt Production automatisch aus `main` (visueller Live-Check durch Martin)
 > **Owner:** Martin
 > **Constitution:** II (jede Seite ein vorzeigbares Artefakt), III (geteilte Schemas/Keys in `@f1/shared`, kein Doppel-Code), IV (Kosten: nur freie APIs, server-seitig gecacht, kein neues AWS), V (Demo jederzeit — Off-Season-Fallback), VI (Zod an jeder externen Grenze, lautes Scheitern), X (pragmatische Tests + 1 Playwright-Smoke pro App), XII (README + Live-URLs aktuell).
 

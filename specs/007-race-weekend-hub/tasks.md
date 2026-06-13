@@ -27,5 +27,5 @@
 | T20 | Predictor Playwright-Smoke auf neue Panels erweitern; Gate grün (typecheck/lint/format/test)                                               | ✅     | AC-11, X       |
 | T21 | Dashboard: Tokens aus `@f1/shared` übernehmen + Team-Farben in Standings/Results/Timing-Tower (funktional unverändert); Smoke grün         | ✅     | AC-10          |
 | T22 | README: Hub-Features + Screenshots + Datenquellen-Attribution (ODbL/Open-Meteo); Phasen-Tabelle Phase 7                                    | ✅     | XII            |
-| T23 | Deploy-Verifikation auf Vercel-Preview (beide Apps) **(Martin/Vercel)** — lokaler Prod-Build beider Apps + Demo-Smoke grün                 | ⬜     | DoD            |
-| T24 | Close-out: Spec-Status `done`, `git tag phase-7-done`, Merge nach `main` **(Martin)**                                                      | ⬜     | DoD            |
+| T23 | Vercel deployt Production automatisch aus `main` (push erfolgt); visueller Live-Check der URLs **(Martin)**                                | 🚧     | DoD            |
+| T24 | Close-out: Spec-Status `done`, `git tag phase-7-done`, Merge nach `main` + Push                                                            | ✅     | DoD            |

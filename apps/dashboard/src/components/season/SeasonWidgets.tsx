@@ -94,7 +94,13 @@ export function NextRaceHero({ race }: { race: RaceMeta | null }): ReactNode {
   );
 }
 
-export function DriverStandingsCard({ rows }: { rows: DriverStanding[] | null }): ReactNode {
+export function DriverStandingsCard({
+  rows,
+  focusDriver,
+}: {
+  rows: DriverStanding[] | null;
+  focusDriver?: string | null;
+}): ReactNode {
   return (
     <Card title="Fahrer-Weltrangliste" meta={rows ? `${rows.length} Fahrer` : undefined}>
       {!rows ? (
@@ -112,7 +118,10 @@ export function DriverStandingsCard({ rows }: { rows: DriverStanding[] | null })
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.code + r.position}>
+              <tr
+                key={r.code + r.position}
+                className={r.code === focusDriver ? styles.rowFocus : ""}
+              >
                 <td className={r.position === 1 ? styles.leaderPos : styles.pos}>{r.position}</td>
                 <td>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>

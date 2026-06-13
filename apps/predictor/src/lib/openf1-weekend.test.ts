@@ -24,12 +24,32 @@ function session(over: Partial<Session> & Pick<Session, "session_type" | "date_s
 
 describe("pickWeekendForRace", () => {
   const weekendA: Session[] = [
-    session({ session_type: "Practice", session_name: "FP1", date_start: "2026-06-05T13:30:00+00:00", meeting_key: 100 }),
-    session({ session_type: "Qualifying", session_name: "Qualifying", date_start: "2026-06-06T18:00:00+00:00", meeting_key: 100 }),
-    session({ session_type: "Race", session_name: "Race", date_start: "2026-06-07T18:00:00+00:00", meeting_key: 100 }),
+    session({
+      session_type: "Practice",
+      session_name: "FP1",
+      date_start: "2026-06-05T13:30:00+00:00",
+      meeting_key: 100,
+    }),
+    session({
+      session_type: "Qualifying",
+      session_name: "Qualifying",
+      date_start: "2026-06-06T18:00:00+00:00",
+      meeting_key: 100,
+    }),
+    session({
+      session_type: "Race",
+      session_name: "Race",
+      date_start: "2026-06-07T18:00:00+00:00",
+      meeting_key: 100,
+    }),
   ];
   const weekendB: Session[] = [
-    session({ session_type: "Race", session_name: "Race", date_start: "2026-06-21T13:00:00+00:00", meeting_key: 200 }),
+    session({
+      session_type: "Race",
+      session_name: "Race",
+      date_start: "2026-06-21T13:00:00+00:00",
+      meeting_key: 200,
+    }),
   ];
 
   it("returns only the matching weekend's sessions, sorted chronologically", () => {
@@ -44,7 +64,9 @@ describe("pickWeekendForRace", () => {
   });
 
   it("ignores cancelled races and returns [] when there is no race", () => {
-    const onlyPractice = [session({ session_type: "Practice", date_start: "2026-06-05T13:30:00+00:00" })];
+    const onlyPractice = [
+      session({ session_type: "Practice", date_start: "2026-06-05T13:30:00+00:00" }),
+    ];
     expect(pickWeekendForRace(onlyPractice, "2026-06-07")).toEqual([]);
     expect(pickWeekendForRace([], "2026-06-07")).toEqual([]);
   });

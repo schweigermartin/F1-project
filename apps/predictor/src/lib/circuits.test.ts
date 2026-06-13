@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { featureCoords, matchCircuitFeature, projectToSvg, type LonLat } from "./circuits";
+import { featureCoords, type LonLat, matchCircuitFeature, projectToSvg } from "./circuits";
 
 describe("projectToSvg", () => {
   it("fits a square loop into the padded viewBox with latitude flipped", () => {
@@ -74,8 +74,28 @@ describe("featureCoords", () => {
 
 describe("matchCircuitFeature", () => {
   const features = [
-    { type: "Feature" as const, properties: { name: "Circuit Gilles Villeneuve", Location: "Montreal" }, geometry: { type: "LineString" as const, coordinates: [[0, 0], [1, 1]] } },
-    { type: "Feature" as const, properties: { name: "Silverstone Circuit", Location: "Silverstone" }, geometry: { type: "LineString" as const, coordinates: [[0, 0], [1, 1]] } },
+    {
+      type: "Feature" as const,
+      properties: { name: "Circuit Gilles Villeneuve", Location: "Montreal" },
+      geometry: {
+        type: "LineString" as const,
+        coordinates: [
+          [0, 0],
+          [1, 1],
+        ],
+      },
+    },
+    {
+      type: "Feature" as const,
+      properties: { name: "Silverstone Circuit", Location: "Silverstone" },
+      geometry: {
+        type: "LineString" as const,
+        coordinates: [
+          [0, 0],
+          [1, 1],
+        ],
+      },
+    },
   ] as Parameters<typeof matchCircuitFeature>[0];
 
   it("matches on circuit name keyword", () => {
@@ -84,11 +104,16 @@ describe("matchCircuitFeature", () => {
   });
 
   it("matches on locality when name differs", () => {
-    const m = matchCircuitFeature(features, { circuit: "British GP Track", locality: "Silverstone" });
+    const m = matchCircuitFeature(features, {
+      circuit: "British GP Track",
+      locality: "Silverstone",
+    });
     expect(m?.properties.name).toBe("Silverstone Circuit");
   });
 
   it("returns null when nothing matches", () => {
-    expect(matchCircuitFeature(features, { circuit: "Monaco", locality: "Monte Carlo" })).toBeNull();
+    expect(
+      matchCircuitFeature(features, { circuit: "Monaco", locality: "Monte Carlo" }),
+    ).toBeNull();
   });
 });

@@ -11,12 +11,12 @@
  */
 
 import {
-  PositionSchema,
-  SessionSchema,
-  WeatherSchema,
   type Position,
+  PositionSchema,
   type Session,
+  SessionSchema,
   type Weather,
+  WeatherSchema,
 } from "@f1/shared";
 import { z } from "zod";
 

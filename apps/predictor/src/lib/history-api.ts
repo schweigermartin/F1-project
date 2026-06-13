@@ -43,10 +43,7 @@ export interface TrackWinner {
   constructor: string;
 }
 
-export async function getTrackWinners(
-  circuitId: string,
-  n = 5,
-): Promise<TrackWinner[] | null> {
+export async function getTrackWinners(circuitId: string, n = 5): Promise<TrackWinner[] | null> {
   try {
     const res = await fetch(`${BASE}/circuits/${circuitId}/results/1/?format=json&limit=60`, {
       next: { revalidate: REVALIDATE_SECONDS },

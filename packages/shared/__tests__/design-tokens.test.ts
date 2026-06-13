@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  DESIGN_TOKENS,
-  tokenCssVarPairs,
-  tokensToCssVars,
-} from "../src/design-tokens.js";
+import { DESIGN_TOKENS, tokenCssVarPairs, tokensToCssVars } from "../src/design-tokens.js";
 
 describe("design tokens", () => {
   it("emits one CSS var per token across all groups", () => {

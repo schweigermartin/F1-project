@@ -44,7 +44,11 @@ export const TEAM_COLORS = {
 export type TeamKey = keyof typeof TEAM_COLORS;
 
 function normalize(name: string): string {
-  return name.toLowerCase().replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
+  return name
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**

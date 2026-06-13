@@ -4,8 +4,8 @@ import {
   driverTeamColor,
   NEUTRAL_TEAM_COLOR,
   TEAM_COLORS,
-  TeamColorSchema,
   teamColor,
+  TeamColorSchema,
 } from "../src/teams.js";
 
 describe("teamColor", () => {

@@ -1,0 +1,326 @@
+/* Season Explorer (Phase 8) — clean, modern, subtle motion. All colours/spacing
+   via shared @f1/shared tokens (var(--…)), consistent with the predictor hub. */
+
+/* ── Sticky selector bar ─────────────────────────────────────────────────── */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md) var(--space-lg);
+  margin: 0 0 var(--space-xl);
+  padding: var(--space-md) var(--space-lg);
+  background: rgba(10, 14, 20, 0.82);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: opacity 0.18s ease;
+}
+.barPending {
+  opacity: 0.55;
+}
+.group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.groupLabel {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-weight: 700;
+}
+.select {
+  appearance: none;
+  background: var(--surface-2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.4rem 2rem 0.4rem 0.7rem;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    right 0.95rem center,
+    right 0.65rem center;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color 0.15s;
+}
+.select:hover,
+.select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.tabs {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+}
+.tab {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.3rem 0.8rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.tab:hover {
+  color: var(--fg);
+}
+.tabActive {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ── Podium strip ────────────────────────────────────────────────────────── */
+.podium {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  gap: var(--space-md);
+  align-items: end;
+  margin-bottom: var(--space-xl);
+}
+.podCard {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--surface), var(--bg));
+  padding: var(--space-lg);
+  text-align: center;
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.podCard:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.podCard:nth-child(3) {
+  animation-delay: 0.1s;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.podTop {
+  /* P1 card sits a bit taller */
+  padding-top: var(--space-xl);
+  padding-bottom: var(--space-xl);
+}
+.podBar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+}
+.podPos {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+.podCode {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin: var(--space-xs) 0;
+}
+.podName {
+  font-size: 0.82rem;
+}
+.podMeta {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin-top: var(--space-xs);
+}
+
+/* ── Result board ────────────────────────────────────────────────────────── */
+.board {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.board th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.3rem 0.6rem;
+}
+.board td {
+  padding: 0.5rem 0.6rem;
+  border-top: 1px solid var(--border);
+  vertical-align: middle;
+}
+.board tbody tr {
+  transition: background 0.12s;
+}
+.board tbody tr:hover {
+  background: var(--surface-2);
+}
+.rowFocus {
+  background: rgba(225, 6, 0, 0.1) !important;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.cellPos {
+  width: 2rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.cellDriver {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.teamBar {
+  width: 4px;
+  height: 18px;
+  border-radius: 2px;
+  flex: none;
+}
+.code {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-left: 0.35rem;
+}
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pts {
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sub {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.gold {
+  color: var(--gold);
+  font-weight: 800;
+}
+.silver {
+  color: var(--silver);
+  font-weight: 800;
+}
+.bronze {
+  color: var(--bronze);
+  font-weight: 800;
+}
+
+/* ── Driver focus card ───────────────────────────────────────────────────── */
+.focus {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg) var(--space-2xl);
+  align-items: center;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--surface), var(--bg));
+  padding: var(--space-lg) var(--space-xl);
+  margin-bottom: var(--space-xl);
+}
+.focusName {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.focusTeam {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.focusStats {
+  display: flex;
+  gap: var(--space-xl);
+}
+.statVal {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.statLabel {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+/* ── Calendar rail ───────────────────────────────────────────────────────── */
+.rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-sm);
+}
+.railItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    transform 0.1s;
+}
+.railItem:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.railSelected {
+  border-color: var(--accent);
+  background: rgba(225, 6, 0, 0.1);
+}
+.railPast {
+  opacity: 0.5;
+}
+.railRound {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--muted);
+}
+.railName {
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.railDate {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: var(--space-md) 0;
+}

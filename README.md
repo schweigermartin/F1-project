@@ -101,6 +101,25 @@ Saison-Performance-Chart; wird das Modell schlechter, greift das manuelle
 Re-Training-Runbook ([docs/retraining-runbook.md](docs/retraining-runbook.md))
 mit Roll-out-Gate und explizitem Version-Flip — wie in Phase 6 erprobt.
 
+## Race Weekend Hub (Phase 7)
+
+Der Predictor wird vom reinen Wahrscheinlichkeits-Board zum **Rennwochenende-Cockpit**:
+Session-Timeline (FP1→Rennen) mit lokaler Zeit + Countdown, interaktive
+**Streckenkarte** (echtes Layout, animierte Runde), **Wetter** für den Renntag,
+Podiums-Vorhersage als **Fahrer-Karten in Team-Farben** mit aufklappbarem
+**SHAP-Wasserfall** + Claude-Begründung, **Grid-vs-Vorhersage**, Strecken-Historie,
+ein **Live-/Ergebnis-Panel** (Vorhersage vs. Realität, Top-3 grün/rot) und der
+interaktive Saison-Chart. Ein gemeinsames Design-Token-Set + die Team-Farben-Map
+in `@f1/shared` geben Predictor, Dashboard-Landing und Live-Seite **eine** visuelle
+Sprache. Alles aus **kostenlosen** Quellen, **ohne neuen AWS-Service**.
+
+**Freie Datenquellen (kein Key):**
+
+- [Jolpica/Ergast](https://jolpi.ca/) — Kalender, Standings, Ergebnisse, Quali, Strecken-Historie (server-seitig, gecacht).
+- [OpenF1](https://openf1.org/) — Session-Zeiten, Live-Wetter, Live-Positionen (client-seitig nur während aktiver Sessions).
+- [Open-Meteo](https://open-meteo.com/) — Renntag-Wettervorhersage.
+- Streckengeometrie aus [bacinger/f1-circuits](https://github.com/bacinger/f1-circuits) (ODbL) — server-seitig gefetcht + projiziert.
+
 ## Spec-Driven Development
 
 Dieses Projekt folgt SDD (spec-kit-inspiriert). Workflow:
@@ -118,15 +137,16 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 
 ## Phasen
 
-| #   | Phase                                                                  | Status      | Ergebnis                                                                                                                                                                                                       |
-| --- | ---------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0   | [Foundation](specs/000-foundation/spec.md)                             | ✅ done     | Monorepo + AWS-Setup + CDK + S3-Layout (deployed in eu-central-1)                                                                                                                                              |
-| 1   | [Data Pipeline](specs/001-data-pipeline/spec.md)                       | ✅ deployed | OpenF1 → SQS → Lambda → DynamoDB + S3 (live since 2026-05-30)                                                                                                                                                  |
-| 2   | [Live Dashboard](specs/002-dashboard/spec.md)                          | ✅ deployed | F1-Realtime-Stack (WebSocket-API, 5 λ, HMAC-Auth) + Next.js/visx-Frontend live auf Vercel                                                                                                                      |
-| 3   | [ML Model](specs/003-ml-model/spec.md)                                 | ✅ done     | XGBoost-Podium-Classifier (ROC-AUC 0.93 · Log-Loss 0.28, Test 2025) + SHAP, Artefakt `models/0.1.0/` in S3                                                                                                     |
-| 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md)             | ✅ deployed | F1-Inference-Stack (Docker-λ: XGBoost + Bedrock/Claude Haiku 4.5, T-60min-Trigger) + Read-API + Predictor-Frontend live auf Vercel                                                                             |
-| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)                       | ✅ deployed | Evaluation-λ (Archiver-Event → Vorhersage vs. S3-Archiv → Hit-Rate/Brier in DDB) + Saison-Chart im Predictor + Re-Training-Runbook; live in eu-central-1, ≥3 ausgewertete Rennen akkumulieren über die Saison  |
-| 6   | [Quali + Practice Features](specs/006-quali-practice-features/spec.md) | ✅ deployed | Modell `0.2.0` (6 → 12 Features: Quali-Segment/Grid-Delta/Teammate-Gap + Practice-Pace/Long-Run/Laps), Roll-out-Gate vs `0.1.0` bestanden (ROC-AUC 0.938 · Log-Loss 0.283, Test 2025), live in der Inference-λ |
+| #   | Phase                                                                  | Status       | Ergebnis                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --- | ---------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0   | [Foundation](specs/000-foundation/spec.md)                             | ✅ done      | Monorepo + AWS-Setup + CDK + S3-Layout (deployed in eu-central-1)                                                                                                                                                                                                                                                                                                                                           |
+| 1   | [Data Pipeline](specs/001-data-pipeline/spec.md)                       | ✅ deployed  | OpenF1 → SQS → Lambda → DynamoDB + S3 (live since 2026-05-30)                                                                                                                                                                                                                                                                                                                                               |
+| 2   | [Live Dashboard](specs/002-dashboard/spec.md)                          | ✅ deployed  | F1-Realtime-Stack (WebSocket-API, 5 λ, HMAC-Auth) + Next.js/visx-Frontend live auf Vercel                                                                                                                                                                                                                                                                                                                   |
+| 3   | [ML Model](specs/003-ml-model/spec.md)                                 | ✅ done      | XGBoost-Podium-Classifier (ROC-AUC 0.93 · Log-Loss 0.28, Test 2025) + SHAP, Artefakt `models/0.1.0/` in S3                                                                                                                                                                                                                                                                                                  |
+| 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md)             | ✅ deployed  | F1-Inference-Stack (Docker-λ: XGBoost + Bedrock/Claude Haiku 4.5, T-60min-Trigger) + Read-API + Predictor-Frontend live auf Vercel                                                                                                                                                                                                                                                                          |
+| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)                       | ✅ deployed  | Evaluation-λ (Archiver-Event → Vorhersage vs. S3-Archiv → Hit-Rate/Brier in DDB) + Saison-Chart im Predictor + Re-Training-Runbook; live in eu-central-1, ≥3 ausgewertete Rennen akkumulieren über die Saison                                                                                                                                                                                               |
+| 6   | [Quali + Practice Features](specs/006-quali-practice-features/spec.md) | ✅ deployed  | Modell `0.2.0` (6 → 12 Features: Quali-Segment/Grid-Delta/Teammate-Gap + Practice-Pace/Long-Run/Laps), Roll-out-Gate vs `0.1.0` bestanden (ROC-AUC 0.938 · Log-Loss 0.283, Test 2025), live in der Inference-λ                                                                                                                                                                                              |
+| 7   | [Race Weekend Hub](specs/007-race-weekend-hub/spec.md)                 | 🚧 in Arbeit | Predictor wird zum Rennwochenende-Cockpit: Session-Timeline + Countdown, interaktive Streckenkarte (animierte Runde), Wetter (Open-Meteo), Podium-Karten in Team-Farben + SHAP-Wasserfall, Grid-vs-Vorhersage, Strecken-Historie, Live-/Ergebnis-Panel (Vorhersage vs. Realität), interaktiver Saison-Chart; gemeinsame Design-Tokens + Team-Farben über alle Frontends. Nur freie APIs, **kein neues AWS** |
 
 ## Stack
 
@@ -141,7 +161,7 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 
 ## Reihenfolge
 
-Phase 0 → 1 → 2 → 3 → 4 → 5. Phase 2 schließt Projekt 2 ab; Phase 4 schließt Projekt 1 ab. Wenn die Zeit ausgeht, gibt es nach Phase 2 schon eine vollständige Demo.
+Phase 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7. Phase 2 schließt Projekt 2 ab; Phase 4 schließt Projekt 1 ab; Phase 7 hebt alle Frontends auf ein gemeinsames, vorzeigbares Niveau. Wenn die Zeit ausgeht, gibt es nach Phase 2 schon eine vollständige Demo.
 
 ## Setup (lokal)
 

@@ -23,12 +23,7 @@ function lap(driver_number: number, lap_duration: number | null, opts: Partial<L
 
 describe("fastestPerDriver", () => {
   it("keeps the minimum valid lap per driver, sorted ascending", () => {
-    const ranked = fastestPerDriver([
-      lap(1, 80.5),
-      lap(1, 79.9),
-      lap(16, 79.2),
-      lap(16, 81.0),
-    ]);
+    const ranked = fastestPerDriver([lap(1, 80.5), lap(1, 79.9), lap(16, 79.2), lap(16, 81.0)]);
     expect(ranked).toEqual([
       { driver_number: 16, lap: 79.2 },
       { driver_number: 1, lap: 79.9 },

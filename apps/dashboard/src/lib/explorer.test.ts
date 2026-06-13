@@ -48,10 +48,25 @@ describe("resolveSelection", () => {
 
 describe("buildDriverFocus", () => {
   const standings: DriverStanding[] = [
-    { position: 3, points: "148", wins: "2", name: "Max Verstappen", code: "VER", constructor: "Red Bull Racing" },
+    {
+      position: 3,
+      points: "148",
+      wins: "2",
+      name: "Max Verstappen",
+      code: "VER",
+      constructor: "Red Bull Racing",
+    },
   ];
   const rows: RaceResultRow[] = [
-    { position: 2, driver: "Max Verstappen", code: "VER", constructor: "Red Bull Racing", points: "18", grid: "3", result: "+5.1s" },
+    {
+      position: 2,
+      driver: "Max Verstappen",
+      code: "VER",
+      constructor: "Red Bull Racing",
+      points: "18",
+      grid: "3",
+      result: "+5.1s",
+    },
   ];
 
   it("merges standings + race result for the focused driver", () => {

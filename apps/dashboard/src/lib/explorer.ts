@@ -46,7 +46,7 @@ export interface Selection {
  * no focus) so a hand-edited URL never crashes the page.
  */
 export function resolveSelection(
-  params: { round?: string; session?: string; driver?: string },
+  params: { round?: string | undefined; session?: string | undefined; driver?: string | undefined },
   schedule: RaceMeta[] | null,
   now: Date,
 ): Selection {

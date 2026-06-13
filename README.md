@@ -56,7 +56,7 @@ Zwei zusammenhängende Systeme, die eine gemeinsame Datenpipeline teilen:
                            │                            │ history.csv  │
                            │                            │ in S3        │
                            │                            └──────┬───────┘
-                           │ Feedback Loop 🛠️ (Phase 5):       │
+                           │ Feedback Loop ✅ (Phase 5):       │
                            │ Archiver-Event → F1-Evaluation λ  │
                            │ S3-Archiv vs. F1Predictions       │
                            │ → Hit-Rate/Brier → Saison-Chart   │
@@ -125,7 +125,7 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 | 2   | [Live Dashboard](specs/002-dashboard/spec.md)                          | ✅ deployed | F1-Realtime-Stack (WebSocket-API, 5 λ, HMAC-Auth) + Next.js/visx-Frontend live auf Vercel                                                                                                                      |
 | 3   | [ML Model](specs/003-ml-model/spec.md)                                 | ✅ done     | XGBoost-Podium-Classifier (ROC-AUC 0.93 · Log-Loss 0.28, Test 2025) + SHAP, Artefakt `models/0.1.0/` in S3                                                                                                     |
 | 4   | [Inference + Bedrock](specs/004-inference-bedrock/spec.md)             | ✅ deployed | F1-Inference-Stack (Docker-λ: XGBoost + Bedrock/Claude Haiku 4.5, T-60min-Trigger) + Read-API + Predictor-Frontend live auf Vercel                                                                             |
-| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)                       | 🛠️ built    | Evaluation-λ (Archiver-Event → Vorhersage vs. S3-Archiv → Hit-Rate/Brier in DDB) + Saison-Chart im Predictor + Re-Training-Runbook; Deploy + ≥3 ausgewertete Rennen ausstehend                                 |
+| 5   | [Feedback Loop](specs/005-feedback-loop/spec.md)                       | ✅ deployed | Evaluation-λ (Archiver-Event → Vorhersage vs. S3-Archiv → Hit-Rate/Brier in DDB) + Saison-Chart im Predictor + Re-Training-Runbook; live in eu-central-1, ≥3 ausgewertete Rennen akkumulieren über die Saison  |
 | 6   | [Quali + Practice Features](specs/006-quali-practice-features/spec.md) | ✅ deployed | Modell `0.2.0` (6 → 12 Features: Quali-Segment/Grid-Delta/Teammate-Gap + Practice-Pace/Long-Run/Laps), Roll-out-Gate vs `0.1.0` bestanden (ROC-AUC 0.938 · Log-Loss 0.283, Test 2025), live in der Inference-λ |
 
 ## Stack

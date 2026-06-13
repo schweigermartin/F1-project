@@ -1,7 +1,7 @@
 # Spec: Feedback Loop
 
 > **Phase:** 005
-> **Status:** in progress — Spec ausgearbeitet (war Stub bis Phase 6 done)
+> **Status:** done — deployed in eu-central-1 (Trigger-Pfad verifiziert; ≥3 ausgewertete Rennen akkumulieren über die Saison ab Barcelona 2026-06-14)
 > **Owner:** Martin
 > **Constitution:** II (vorzeigbares Artefakt: Saison-Chart), III (geteilte Schemas/Keys, einmal gebaut), IV (Kosten: ~24 Läufe/Jahr, kein Polling), VI (Zod an jeder Grenze), VIII (Alarm pro Lambda), IX (versionierte Modelle, kein `latest/`), X (pragmatische Tests), XII (README erzählt die Loop-Story).
 

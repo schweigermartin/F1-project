@@ -1,7 +1,7 @@
 # Spec: Interactive Season Explorer (Dashboard)
 
 > **Phase:** 008
-> **Status:** draft
+> **Status:** done — implementiert, getestet (Gate grün), Merge nach `main` + Tag
 > **Owner:** Martin
 > **Constitution:** II (vorzeigbare Live-Seite), III (geteilte Tokens/Team-Farben/Schemas aus `@f1/shared`), IV (nur freie APIs, server-seitig gecacht, kein neues AWS), V (Demo/Off-Season-Fallback bleibt), VI (Zod an jeder externen Grenze), X (pragmatische Tests + Playwright-Smoke), XII (README aktuell).
 

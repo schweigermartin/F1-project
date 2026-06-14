@@ -126,17 +126,24 @@ async function fetchWithBackoff(
  * POLL_INTERVAL_MS until POLL_WINDOW_MS is used up (wall-clock via deps.now,
  * so a slow tick eats into the window instead of overrunning the λ timeout).
  * Returns every tick's summary; the adapter logs them as one line.
+ *
+ * `deadlineMs` is an absolute epoch-ms ceiling (typically derived from
+ * `context.getRemainingTimeInMillis()`) passed into each tick so that
+ * individual endpoint fetches are skipped when time is exhausted — preventing
+ * the Lambda timeout that occurred when OpenF1 was heavily rate-limiting during
+ * a live race and per-tick backoff blew past 75 s.
  */
 export async function pollSession(
   event: PollerEvent,
   deps: PollerDeps,
   windowMs: number = POLL_WINDOW_MS,
+  deadlineMs?: number,
 ): Promise<PollerSummary[]> {
   const startedAt = deps.now().getTime();
   const summaries: PollerSummary[] = [];
   for (;;) {
     const tickStart = deps.now().getTime();
-    summaries.push(await pollOnce(event, deps));
+    summaries.push(await pollOnce(event, deps, deadlineMs));
     const nextTickAt = tickStart + POLL_INTERVAL_MS;
     if (nextTickAt >= startedAt + windowMs) break;
     const wait = nextTickAt - deps.now().getTime();
@@ -145,7 +152,11 @@ export async function pollSession(
   return summaries;
 }
 
-export async function pollOnce(event: PollerEvent, deps: PollerDeps): Promise<PollerSummary> {
+export async function pollOnce(
+  event: PollerEvent,
+  deps: PollerDeps,
+  deadlineMs?: number,
+): Promise<PollerSummary> {
   const now = deps.now();
   const fetched_at = now.toISOString();
   const session_id = String(event.session_key);
@@ -169,6 +180,7 @@ export async function pollOnce(event: PollerEvent, deps: PollerDeps): Promise<Po
 
   for (const endpoint of OPENF1_DATA_ENDPOINTS) {
     if (endpoint === "weather" && !pollWeather) continue;
+    if (deadlineMs !== undefined && deps.now().getTime() >= deadlineMs) break;
     summary.attempted += 1;
 
     const result = await fetchWithBackoff(endpointUrl(endpoint, event.session_key), deps);

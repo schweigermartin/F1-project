@@ -1,18 +1,22 @@
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
-import type { ScheduledEvent } from "aws-lambda";
+import type { Context, ScheduledEvent } from "aws-lambda";
 
-import { type PollerEvent, pollSession } from "./handler.js";
+import { POLL_WINDOW_MS, type PollerEvent, pollSession } from "./handler.js";
 
 const QUEUE_URL = process.env["EVENTS_QUEUE_URL"];
 if (!QUEUE_URL) throw new Error("EVENTS_QUEUE_URL env var not set");
 
 const sqs = new SQSClient({});
 
+/** Safety buffer kept for the Lambda runtime to shut down cleanly. */
+const LAMBDA_SHUTDOWN_BUFFER_MS = 5_000;
+
 // Lambda entrypoint. EventBridge Scheduler delivers either a ScheduledEvent
 // shell with our `{ session_key }` as the Input payload, or — when invoked
 // manually — a bare PollerEvent. Accept both shapes.
 export async function handler(
   event: ScheduledEvent | PollerEvent,
+  context: Context,
 ): Promise<{ ok: boolean; summary: unknown }> {
   const sessionKey = "session_key" in event ? event.session_key : undefined;
   if (typeof sessionKey !== "number") {
@@ -20,6 +24,14 @@ export async function handler(
   }
 
   const metrics: Array<{ name: string; value: number; dim?: Record<string, string> }> = [];
+
+  // Deadline = now + (remaining Lambda time − shutdown buffer). Capped at the
+  // nominal POLL_WINDOW_MS so normal ticks are unaffected; the ceiling only
+  // kicks in when backoff during a rate-limit storm would otherwise push the
+  // last tick past the Lambda timeout (seen during the 2026-06-13 race).
+  const remainingMs = context.getRemainingTimeInMillis();
+  const windowMs = Math.min(POLL_WINDOW_MS, remainingMs - LAMBDA_SHUTDOWN_BUFFER_MS);
+  const deadlineMs = Date.now() + windowMs;
 
   // One scheduler firing (rate(1 minute)) = one minute of 5s snapshots — the
   // scheduler can't fire sub-minute, so the loop lives here (handler.ts).
@@ -34,6 +46,8 @@ export async function handler(
       sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
       emitMetric: (name, value, dim) => metrics.push({ name, value, dim }),
     },
+    windowMs,
+    deadlineMs,
   );
 
   const http_failures = summaries.reduce((n, s) => n + s.http_failures, 0);

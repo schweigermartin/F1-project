@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   endpointUrl,
+  POLL_WINDOW_MS,
   type PollerDeps,
   type PollerEvent,
   pollOnce,
@@ -314,6 +315,51 @@ describe("pollOnce — network errors", () => {
   });
 });
 
+describe("pollOnce — deadline ceiling (2026-06-13 rate-limit storm)", () => {
+  it("polls every endpoint when the deadline is comfortably in the future", async () => {
+    const now = new Date("2026-05-24T20:30:00.000Z"); // :00 → weather tick
+    const m = makeMocks({ now, respondTo: () => ({ status: 200, body: [] }) });
+    const deadlineMs = now.getTime() + 60_000;
+
+    const summary = await pollOnce(evt, m.deps, deadlineMs);
+
+    expect(summary.attempted).toBe(5);
+    expect(m.fetch).toHaveBeenCalledTimes(5);
+  });
+
+  it("stops attempting endpoints once the wall clock crosses the deadline", async () => {
+    let clock = Date.parse("2026-05-24T20:30:00.000Z");
+    const m = makeMocks({});
+    m.deps.now = () => new Date(clock);
+    // Each fetch burns 10s of wall-clock — simulates per-endpoint 429 backoff
+    // during a rate-limit storm. The deadline must short-circuit the loop
+    // before it overruns the Lambda timeout.
+    const fetch = vi.fn(async (): Promise<Response> => {
+      clock += 10_000;
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+    m.deps.fetch = fetch as unknown as typeof globalThis.fetch;
+
+    // Deadline = start + 25s. The per-endpoint guard runs before each fetch:
+    // attempts at clock 0s, 10s, 20s pass; the 4th check (clock 30s) breaks.
+    const deadlineMs = clock + 25_000;
+    const summary = await pollOnce(evt, m.deps, deadlineMs);
+
+    expect(summary.attempted).toBe(3);
+    expect(summary.succeeded).toBe(3);
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("is a no-op guard when deadlineMs is undefined (back-compat)", async () => {
+    const now = new Date("2026-05-24T20:30:00.000Z");
+    const m = makeMocks({ now, respondTo: () => ({ status: 200, body: [] }) });
+
+    const summary = await pollOnce(evt, m.deps);
+
+    expect(summary.attempted).toBe(5);
+  });
+});
+
 describe("pollSession — one minute of 5s ticks (scheduler can't fire sub-minute)", () => {
   /** Virtual clock: now() reads it, sleep() advances it — no real waiting. */
   function makeClockedMocks(start = Date.parse("2026-05-24T20:30:00.000Z")): Mocks & {
@@ -337,6 +383,18 @@ describe("pollSession — one minute of 5s ticks (scheduler can't fire sub-minut
     // Instant ticks → every wait is the full 5s interval.
     expect(m.sleep).toHaveBeenCalledTimes(10);
     expect(m.sleep).toHaveBeenLastCalledWith(5000);
+  });
+
+  it("threads deadlineMs into every tick — fetches are skipped once it has passed", async () => {
+    const m = makeClockedMocks();
+    const alreadyPassed = Date.parse("2026-05-24T20:30:00.000Z") - 1;
+    const summaries = await pollSession(evt, m.deps, POLL_WINDOW_MS, alreadyPassed);
+
+    // Window bookkeeping is unaffected — still 11 ticks across 55s …
+    expect(summaries).toHaveLength(11);
+    // … but the deadline guard means each tick attempts zero endpoints.
+    expect(summaries.every((s) => s.attempted === 0)).toBe(true);
+    expect(m.fetch).not.toHaveBeenCalled();
   });
 
   it("a window smaller than one interval still produces exactly one snapshot", async () => {

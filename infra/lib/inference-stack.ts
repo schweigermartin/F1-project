@@ -23,6 +23,7 @@ import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as logs from "aws-cdk-lib/aws-logs";
 import { type IBucket } from "aws-cdk-lib/aws-s3";
 import { type ITopic } from "aws-cdk-lib/aws-sns";
+import * as sqs from "aws-cdk-lib/aws-sqs";
 import { type Construct } from "constructs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -49,6 +50,13 @@ const EVALUATION_METRIC_NAMESPACE = "F1/Evaluation";
  * cross-stack reference (which would create a Pipeline↔Inference cycle). */
 export const INFERENCE_FN_NAME = "F1-Inference";
 export const INFERENCE_SCHEDULER_ROLE_NAME = "F1-Scheduler-InvokeInference";
+/** DLQ for the one-shot inference schedules: if aws-scheduler fires but can't
+ * deliver to the inference λ (the silent 2026-06-14 failure — schedule fired,
+ * 0 invocations, then self-deleted via ActionAfterCompletion=DELETE, leaving no
+ * trace and no alarm), the failed event lands here and trips the DLQ alarm.
+ * Fixed name so PipelineStack's schedule-sync can build the ARN without a cross-
+ * stack ref (same decoupling as INFERENCE_FN_NAME). */
+export const INFERENCE_SCHEDULER_DLQ_NAME = "F1-Inference-Scheduler-DLQ";
 
 export interface InferenceStackProps extends StackProps {
   /** Shared data bucket — the inference λ reads models/<version>/model.json. */
@@ -190,6 +198,17 @@ export class InferenceStack extends Stack {
     // race — same split as Phase 1 (the role lives in the stack; the per-race
     // schedule entries are programmed at runtime). See the README/plan for how
     // schedule-sync emits the race schedules.
+    // DLQ for failed scheduler→λ deliveries. A one-shot schedule self-deletes
+    // after firing (ActionAfterCompletion=DELETE), so without a DLQ a failed
+    // delivery vanishes silently — exactly the 2026-06-14 incident where the
+    // race-day prediction never ran and nothing alerted. 14-day retention gives
+    // ample time to notice and re-drive a missed race.
+    const schedulerDlq = new sqs.Queue(this, "InferenceSchedulerDlq", {
+      queueName: INFERENCE_SCHEDULER_DLQ_NAME,
+      retentionPeriod: Duration.days(14),
+      enforceSSL: true,
+    });
+
     this.schedulerInvokeRole = new iam.Role(this, "SchedulerInvokeRole", {
       roleName: INFERENCE_SCHEDULER_ROLE_NAME,
       assumedBy: new iam.ServicePrincipal("scheduler.amazonaws.com"),
@@ -211,6 +230,9 @@ export class InferenceStack extends Stack {
         }),
       },
     });
+    // aws-scheduler delivers a failed invocation to the DLQ using the schedule's
+    // execution role, so that role needs sqs:SendMessage on the DLQ.
+    schedulerDlq.grantSendMessages(this.schedulerInvokeRole);
 
     // ─── Read-API (the frontend's only path to the predictions) ───────────
     const { fn, url } = this.addReadApi(props.allowedOrigins);
@@ -221,7 +243,7 @@ export class InferenceStack extends Stack {
     this.evaluationFn = this.addEvaluation(props.dataBucket);
 
     // ─── Alarms + dashboard (Constitution VIII) ───────────────────────────
-    this.addMonitoring(props.alertTopic);
+    this.addMonitoring(props.alertTopic, schedulerDlq);
   }
 
   /**
@@ -344,8 +366,24 @@ export class InferenceStack extends Stack {
     });
   }
 
-  private addMonitoring(alertTopic: ITopic): void {
+  private addMonitoring(alertTopic: ITopic, schedulerDlq: sqs.Queue): void {
     const alertAction = new cwActions.SnsAction(alertTopic);
+
+    // 0. Scheduler→λ delivery failures. Alarms #1/#4 only fire once the λ has
+    // *run* (errors / "ran but empty"); a schedule that fires but never reaches
+    // the λ is invisible to them. Any message here means a race-day inference
+    // never started — the gap behind the 2026-06-14 missed prediction.
+    new cloudwatch.Alarm(this, "InferenceSchedulerDlqAlarm", {
+      alarmName: "F1-Inference-SchedulerDLQ",
+      metric: schedulerDlq.metricApproximateNumberOfMessagesVisible({
+        period: Duration.minutes(5),
+        statistic: "Maximum",
+      }),
+      threshold: 0,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
 
     // 1. Inference errors — any failed invocation is a missed race prediction.
     new cloudwatch.Alarm(this, "InferenceErrorsAlarm", {

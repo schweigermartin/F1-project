@@ -122,6 +122,25 @@ describe("InferenceStack — trigger pathway", () => {
       },
     });
   });
+
+  it("provisions a DLQ for failed scheduler→λ deliveries (2026-06-14 silent-miss fix)", () => {
+    synth().hasResourceProperties("AWS::SQS::Queue", {
+      QueueName: "F1-Inference-Scheduler-DLQ",
+      MessageRetentionPeriod: 14 * 24 * 60 * 60,
+    });
+  });
+
+  it("lets the scheduler role send failed deliveries to the DLQ", () => {
+    synth().hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: Match.arrayWith(["sqs:SendMessage"]),
+          }),
+        ]),
+      },
+    });
+  });
 });
 
 describe("InferenceStack — alarms + dashboard (Constitution VIII)", () => {
@@ -144,6 +163,17 @@ describe("InferenceStack — alarms + dashboard (Constitution VIII)", () => {
       Metrics: Match.arrayWith([
         Match.objectLike({ MetricStat: Match.objectLike({ Metric: Match.anyValue() }) }),
       ]),
+    });
+  });
+
+  it("alarms when a scheduler delivery lands in the DLQ — the λ never started", () => {
+    synth().hasResourceProperties("AWS::CloudWatch::Alarm", {
+      AlarmName: "F1-Inference-SchedulerDLQ",
+      MetricName: "ApproximateNumberOfMessagesVisible",
+      Namespace: "AWS/SQS",
+      ComparisonOperator: "GreaterThanThreshold",
+      Threshold: 0,
+      AlarmActions: Match.anyValue(),
     });
   });
 

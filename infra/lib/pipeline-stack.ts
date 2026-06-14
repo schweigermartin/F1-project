@@ -19,7 +19,11 @@ import * as snsSubs from "aws-cdk-lib/aws-sns-subscriptions";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import { type Construct } from "constructs";
 
-import { INFERENCE_FN_NAME, INFERENCE_SCHEDULER_ROLE_NAME } from "./inference-stack.js";
+import {
+  INFERENCE_FN_NAME,
+  INFERENCE_SCHEDULER_DLQ_NAME,
+  INFERENCE_SCHEDULER_ROLE_NAME,
+} from "./inference-stack.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const lambdaDir = (sub: string): string => path.resolve(__dirname, "..", "lambda", sub);
@@ -218,6 +222,14 @@ export class PipelineStack extends Stack {
           region: "",
           resource: "role",
           resourceName: INFERENCE_SCHEDULER_ROLE_NAME,
+        }),
+        // DLQ for failed inference-schedule deliveries (built by name, no cross-
+        // stack ref). SQS ARNs are `arn:aws:sqs:<region>:<acct>:<queue>` — the
+        // queue name is the bare resource segment (NO_RESOURCE_NAME).
+        INFERENCE_SCHEDULER_DLQ_ARN: Stack.of(this).formatArn({
+          service: "sqs",
+          resource: INFERENCE_SCHEDULER_DLQ_NAME,
+          arnFormat: ArnFormat.NO_RESOURCE_NAME,
         }),
         MODEL_VERSION: ACTIVE_MODEL_VERSION,
       },

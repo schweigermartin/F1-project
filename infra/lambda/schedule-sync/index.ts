@@ -21,6 +21,8 @@ const SCHEDULER_ROLE_ARN = process.env["SCHEDULER_ROLE_ARN"];
 // PipelineStack↔InferenceStack cycle). MODEL_VERSION is the active model id.
 const INFERENCE_FUNCTION_ARN = process.env["INFERENCE_FUNCTION_ARN"];
 const INFERENCE_SCHEDULER_ROLE_ARN = process.env["INFERENCE_SCHEDULER_ROLE_ARN"];
+// DLQ catching scheduler→λ deliveries that fail (the silent 2026-06-14 miss).
+const INFERENCE_SCHEDULER_DLQ_ARN = process.env["INFERENCE_SCHEDULER_DLQ_ARN"];
 const MODEL_VERSION = process.env["MODEL_VERSION"];
 const CURRENT_YEAR = new Date().getUTCFullYear();
 const OPENF1_BASE = "https://api.openf1.org/v1";
@@ -29,6 +31,7 @@ if (!POLLER_FUNCTION_ARN) throw new Error("POLLER_FUNCTION_ARN env var not set")
 if (!SCHEDULER_ROLE_ARN) throw new Error("SCHEDULER_ROLE_ARN env var not set");
 if (!INFERENCE_FUNCTION_ARN) throw new Error("INFERENCE_FUNCTION_ARN env var not set");
 if (!INFERENCE_SCHEDULER_ROLE_ARN) throw new Error("INFERENCE_SCHEDULER_ROLE_ARN env var not set");
+if (!INFERENCE_SCHEDULER_DLQ_ARN) throw new Error("INFERENCE_SCHEDULER_DLQ_ARN env var not set");
 if (!MODEL_VERSION) throw new Error("MODEL_VERSION env var not set");
 
 const scheduler = new SchedulerClient({});
@@ -84,6 +87,9 @@ async function upsertInferenceSchedule(spec: InferenceScheduleSpec): Promise<voi
         round: spec.round,
         model_version: spec.model_version,
       }),
+      // Self-deleting one-shot: without a DLQ a failed delivery leaves no trace
+      // and no alarm. Route failed deliveries to the DLQ so the depth alarm fires.
+      DeadLetterConfig: { Arn: INFERENCE_SCHEDULER_DLQ_ARN! },
     },
   };
   if (await scheduleExists(spec.name)) {

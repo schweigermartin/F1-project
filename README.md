@@ -4,7 +4,7 @@
 
 Zwei zusammenhängende Systeme, die eine gemeinsame Datenpipeline teilen:
 
-1. **Live Telemetry Dashboard** — event-driven AWS-Pipeline, die OpenF1-Daten in Echtzeit ingestiert, persistiert und über WebSockets in ein React-Frontend pusht. Demonstriert Infra-Skills (Lambda, SQS, DynamoDB, S3, EventBridge, API Gateway, IaC).
+1. **Race Telemetry Dashboard** — event-driven AWS-Pipeline, die OpenF1-Daten nach jeder Session ingestiert, persistiert und über WebSockets in ein React-Frontend pusht (Replay aus dem S3-Archiv). Demonstriert Infra-Skills (Lambda, SQS, DynamoDB, S3, EventBridge, API Gateway, IaC).
 2. **Race Outcome Predictor** — ML-Modell (XGBoost/LightGBM) auf historischen FastF1- und live archivierten Daten, mit Bedrock-basierter natürlichsprachlicher Begründung. Demonstriert ML-Skills (Feature Engineering, Training, Evaluation, Inference, LLM-Integration).
 3. **Feedback Loop** — verbindet beide: Vorhersagen vs. tatsächliche Ergebnisse → Trefferquote → Re-Training. Macht aus zwei Projekten ein System.
 
@@ -16,10 +16,10 @@ Zwei zusammenhängende Systeme, die eine gemeinsame Datenpipeline teilen:
                          ┌──────────────┐
                          │  OpenF1 API  │ ✅ (Phase 1, live)
                          └──────┬───────┘
-                                │ poll (5s, nur während Sessions)
+                                │ ingest (1×, 35min nach Session-Ende)
                                 ▼
                        ┌─────────────────┐
-                       │  Poller Lambda  │ ✅ F1-Poller
+                       │  Ingest Lambda  │ ✅ F1-Poller
                        └────────┬────────┘
                                 │
                                 ▼
@@ -78,8 +78,16 @@ Zwei zusammenhängende Systeme, die eine gemeinsame Datenpipeline teilen:
 
 Scheduler (täglich 04:00 UTC):
 - F1-ScheduleSync λ ✅ pollt OpenF1 /sessions, programmiert für jede kommende
-  Session ein aws-scheduler Schedule mit Window [start-15min, end+30min] sowie
+  Session ein einmaliges aws-scheduler Schedule auf end+35min (Ingest) sowie
   ein T-60min-Schedule, das die Inference-Lambda vor jedem Rennen auslöst
+
+Warum nach der Session statt live? OpenF1 klassifiziert Daten von 30min vor
+Session-Start bis 30min nach Session-Ende als "live" und stellt dieses Fenster
+nur zahlenden Nutzern (9,90 €/Monat) bereit. Außerhalb sind dieselben Daten
+kostenlos, final und vollständig. Ein Durchgang ersetzt damit ~700 Poll-Ticks
+pro Session — günstiger, vollständiger und robuster; verzichtet wird allein auf
+Echtzeit. Der bewusste Kosten-Trade-off ist in specs/009-year-round-value/
+dokumentiert.
 
 Querschnitt (alle Phasen):
 - IaC: AWS CDK v2 (TypeScript)              ✅ 4 Stacks (DataLayer + Pipeline + Realtime + Inference)
@@ -166,7 +174,7 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 - **Infra:** AWS CDK (TypeScript)
 - **Compute:** Lambda (TS für Ingest, Python für ML-Inference)
 - **Storage:** S3 (raw events + model artifacts), DynamoDB (live state + predictions)
-- **Messaging:** SQS + DLQ, EventBridge (Polling-Trigger), DynamoDB Streams (WebSocket-Push)
+- **Messaging:** SQS + DLQ, EventBridge (Ingest-/Inference-Trigger), DynamoDB Streams (WebSocket-Push)
 - **Frontend:** Next.js (App Router) + visx + Zustand, deployed auf Vercel
 - **ML:** Python, FastF1, XGBoost/LightGBM, SHAP, Bedrock (Claude) für Explanation
 - **CI:** GitHub Actions
@@ -230,7 +238,7 @@ Nach Schritt 6+7 existieren in deinem Account (alle 4 Stacks):
 - DDB Tables `F1Live` (Streams, TTL 24h) + `F1Connections` (TTL 2h) + `F1Predictions` (on-demand, RETAIN, **kein** TTL — Phase 5 liest sie zurück)
 - SQS `F1-Events` + DLQ
 - API Gateway WebSocket `F1-Realtime` (Stage `live`) + Lambda Function URL für die Predictions-Read-API (CORS-scoped, no-auth)
-- 12 Lambdas — 4 Pipeline (Poller/Consumer/Archiver/Schedule-Sync) · 6 WS (Connect/Disconnect/Authorizer/Subscribe/Fanout/Replay) · `F1-Inference` (Docker/Python: XGBoost + Bedrock) · `F1-Predictions-Api` (Node, Read-API)
+- 12 Lambdas — 4 Pipeline (Ingest/Consumer/Archiver/Schedule-Sync) · 6 WS (Connect/Disconnect/Authorizer/Subscribe/Fanout/Replay) · `F1-Inference` (Docker/Python: XGBoost + Bedrock) · `F1-Predictions-Api` (Node, Read-API)
 - CloudWatch Dashboards `f1-pipeline` + `f1-realtime` + `f1-inference`, 11 Alarme, SNS-Topic `f1-alerts`
 
 Beide Frontends werden separat auf Vercel deployed (je ein Projekt, eigenes Root Directory):

@@ -34,6 +34,10 @@ const lambdaDir = (sub: string): string => path.resolve(__dirname, "..", "lambda
  * the fallback — flip this constant back + redeploy to revert. */
 const ACTIVE_MODEL_VERSION = "0.2.0";
 
+/** DLQ for the Phase-9 one-shot ingest schedules. Fixed name so schedule-sync
+ * can build the ARN without a cross-stack ref (same pattern as the inference DLQ). */
+export const INGEST_SCHEDULER_DLQ_NAME = "F1-Ingest-Scheduler-DLQ";
+
 export interface PipelineStackProps extends StackProps {
   readonly dataBucket: IBucket;
 }
@@ -58,6 +62,7 @@ export class PipelineStack extends Stack {
   readonly liveTable: dynamodb.TableV2;
   readonly eventsQueue: sqs.Queue;
   readonly eventsDlq: sqs.Queue;
+  readonly ingestSchedulerDlq: sqs.Queue;
   readonly pollerFn: lambda.IFunction;
   readonly consumerFn: lambda.IFunction;
   readonly archiverFn: lambda.IFunction;
@@ -117,10 +122,12 @@ export class PipelineStack extends Stack {
       entry: path.join(lambdaDir("poller"), "index.ts"),
       handler: "handler",
       ...lambdaDefaults,
-      memorySize: 256,
-      // One invocation = one minute of 5s ticks (POLL_WINDOW_MS 55s — the
-      // scheduler can't fire sub-minute); 75s leaves margin for the last tick.
-      timeout: Duration.seconds(75),
+      memorySize: 512,
+      // Phase 9: one invocation = one full-session ingest, 35min after the
+      // session ended. A whole race's laps/position/intervals payload is far
+      // larger than the old 5s snapshot, so give it room — it runs once per
+      // session (~120/year), not 700 times.
+      timeout: Duration.minutes(3),
       environment: { EVENTS_QUEUE_URL: this.eventsQueue.queueUrl },
     });
     this.eventsQueue.grantSendMessages(this.pollerFn);
@@ -182,7 +189,7 @@ export class PipelineStack extends Stack {
     );
 
     // ─── Schedule-Sync λ ─────────────────────────────────────────────────
-    // Scheduler-invoke role: aws-scheduler assumes this to invoke the Poller.
+    // Scheduler-invoke role: aws-scheduler assumes this to invoke the Ingest λ.
     this.schedulerInvokeRole = new iam.Role(this, "SchedulerInvokeRole", {
       roleName: "F1-Scheduler-InvokePoller",
       assumedBy: new iam.ServicePrincipal("scheduler.amazonaws.com"),
@@ -191,12 +198,27 @@ export class PipelineStack extends Stack {
           statements: [
             new iam.PolicyStatement({
               actions: ["lambda:InvokeFunction"],
+              // Straight from the construct, so it is always the colon form.
+              // Hand-building this ARN is what broke the inference scheduler
+              // for four races (`function/` instead of `function:`).
               resources: [this.pollerFn.functionArn],
             }),
           ],
         }),
       },
     });
+
+    // Phase 9: the ingest schedules are one-shot and self-deleting, so a failed
+    // delivery would vanish without a trace — the same failure mode that hid the
+    // round-8..11 prediction misses. The ingest λ also throws deliberately when
+    // OpenF1 still reports the session as live, which parks the delivery here
+    // for a redrive once the data has gone free (spec R-1).
+    this.ingestSchedulerDlq = new sqs.Queue(this, "IngestSchedulerDlq", {
+      queueName: INGEST_SCHEDULER_DLQ_NAME,
+      retentionPeriod: Duration.days(14),
+      enforceSSL: true,
+    });
+    this.ingestSchedulerDlq.grantSendMessages(this.schedulerInvokeRole);
 
     this.scheduleSyncFn = new NodejsFunction(this, "ScheduleSyncFn", {
       functionName: "F1-ScheduleSync",
@@ -231,10 +253,13 @@ export class PipelineStack extends Stack {
           resource: INFERENCE_SCHEDULER_DLQ_NAME,
           arnFormat: ArnFormat.NO_RESOURCE_NAME,
         }),
+        // Phase 9: DLQ for failed one-shot ingest deliveries.
+        INGEST_SCHEDULER_DLQ_ARN: this.ingestSchedulerDlq.queueArn,
         MODEL_VERSION: ACTIVE_MODEL_VERSION,
       },
     });
-    // Manage f1-poll-* schedules; pass the invoke role to scheduler.
+    // Manage f1-ingest-*/f1-infer-* schedules (and sweep legacy f1-poll-*);
+    // pass the invoke role to scheduler.
     this.scheduleSyncFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
@@ -283,6 +308,22 @@ export class PipelineStack extends Stack {
     new cloudwatch.Alarm(this, "DLQDepthAlarm", {
       alarmName: "F1-DLQ-Depth",
       metric: this.eventsDlq.metricApproximateNumberOfMessagesVisible({
+        period: Duration.minutes(5),
+        statistic: "Maximum",
+      }),
+      threshold: 0,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(alertAction);
+
+    // Ingest-scheduler DLQ: a one-shot ingest that never reached the λ, or one
+    // that ran while OpenF1 still reported the session as live. Either way a
+    // session's archive is missing and nothing else would say so — exactly the
+    // blind spot that let four races pass without a prediction.
+    new cloudwatch.Alarm(this, "IngestSchedulerDlqAlarm", {
+      alarmName: "F1-Ingest-SchedulerDLQ",
+      metric: this.ingestSchedulerDlq.metricApproximateNumberOfMessagesVisible({
         period: Duration.minutes(5),
         statistic: "Maximum",
       }),

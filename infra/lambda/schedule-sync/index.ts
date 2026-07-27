@@ -10,8 +10,9 @@ import {
 import {
   INFERENCE_SCHEDULE_PREFIX,
   type InferenceScheduleSpec,
-  SCHEDULE_NAME_PREFIX,
-  type ScheduleSpec,
+  INGEST_SCHEDULE_PREFIX,
+  type IngestScheduleSpec,
+  LEGACY_POLL_PREFIX,
   syncSchedules,
 } from "./handler.js";
 
@@ -23,6 +24,8 @@ const INFERENCE_FUNCTION_ARN = process.env["INFERENCE_FUNCTION_ARN"];
 const INFERENCE_SCHEDULER_ROLE_ARN = process.env["INFERENCE_SCHEDULER_ROLE_ARN"];
 // DLQ catching scheduler→λ deliveries that fail (the silent 2026-06-14 miss).
 const INFERENCE_SCHEDULER_DLQ_ARN = process.env["INFERENCE_SCHEDULER_DLQ_ARN"];
+// Same protection for the Phase-9 one-shot ingest deliveries.
+const INGEST_SCHEDULER_DLQ_ARN = process.env["INGEST_SCHEDULER_DLQ_ARN"];
 const MODEL_VERSION = process.env["MODEL_VERSION"];
 const CURRENT_YEAR = new Date().getUTCFullYear();
 const OPENF1_BASE = "https://api.openf1.org/v1";
@@ -32,6 +35,7 @@ if (!SCHEDULER_ROLE_ARN) throw new Error("SCHEDULER_ROLE_ARN env var not set");
 if (!INFERENCE_FUNCTION_ARN) throw new Error("INFERENCE_FUNCTION_ARN env var not set");
 if (!INFERENCE_SCHEDULER_ROLE_ARN) throw new Error("INFERENCE_SCHEDULER_ROLE_ARN env var not set");
 if (!INFERENCE_SCHEDULER_DLQ_ARN) throw new Error("INFERENCE_SCHEDULER_DLQ_ARN env var not set");
+if (!INGEST_SCHEDULER_DLQ_ARN) throw new Error("INGEST_SCHEDULER_DLQ_ARN env var not set");
 if (!MODEL_VERSION) throw new Error("MODEL_VERSION env var not set");
 
 const scheduler = new SchedulerClient({});
@@ -45,21 +49,25 @@ async function scheduleExists(name: string): Promise<boolean> {
   }
 }
 
-async function upsertSchedule(spec: ScheduleSpec): Promise<void> {
+/**
+ * One-shot schedule firing the Ingest λ once at `runAt` (UTC), then self-
+ * deleting. Same shape as the inference schedule below — including the DLQ,
+ * because a self-deleting one-shot that fails to deliver leaves no trace
+ * otherwise (that is exactly how the round-8..11 predictions vanished).
+ */
+async function upsertIngestSchedule(spec: IngestScheduleSpec): Promise<void> {
   const params = {
     Name: spec.name,
-    // aws-scheduler's smallest recurring rate is 1 minute — rate(5 seconds)
-    // is rejected with a ValidationException (production incident: no poll
-    // schedule was ever created). The poller fills each minute with 5s ticks
-    // itself (pollSession), preserving the 5s cadence from the plan.
-    ScheduleExpression: "rate(1 minute)",
-    StartDate: spec.startsAt,
-    EndDate: spec.endsAt,
+    // `at(...)` wants a local timestamp without offset; pin the timezone to UTC.
+    ScheduleExpression: `at(${spec.runAt.toISOString().slice(0, 19)})`,
+    ScheduleExpressionTimezone: "UTC",
     FlexibleTimeWindow: { Mode: "OFF" as const },
+    ActionAfterCompletion: "DELETE" as const,
     Target: {
       Arn: POLLER_FUNCTION_ARN!,
       RoleArn: SCHEDULER_ROLE_ARN!,
       Input: JSON.stringify({ session_key: spec.session_key }),
+      DeadLetterConfig: { Arn: INGEST_SCHEDULER_DLQ_ARN! },
     },
   };
   if (await scheduleExists(spec.name)) {
@@ -101,7 +109,7 @@ async function upsertInferenceSchedule(spec: InferenceScheduleSpec): Promise<voi
 
 async function listSchedules(): Promise<string[]> {
   const names: string[] = [];
-  for (const prefix of [SCHEDULE_NAME_PREFIX, INFERENCE_SCHEDULE_PREFIX]) {
+  for (const prefix of [INGEST_SCHEDULE_PREFIX, INFERENCE_SCHEDULE_PREFIX, LEGACY_POLL_PREFIX]) {
     let token: string | undefined;
     do {
       const res = await scheduler.send(
@@ -126,7 +134,7 @@ export async function handler(): Promise<{ ok: boolean; result: unknown }> {
       return res.json();
     },
     listExistingSchedules: listSchedules,
-    upsertSchedule,
+    upsertIngestSchedule,
     upsertInferenceSchedule,
     deleteSchedule: async (Name) => {
       await scheduler.send(new DeleteScheduleCommand({ Name }));

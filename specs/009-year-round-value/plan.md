@@ -60,11 +60,19 @@ gesunde Substanz. Was sich ändert:
   halbe Daten liefern.
 
 **Selbstheilung (R-1):** Bekommt der Lauf HTTP 401, ist die Session noch im
-Live-Fenster (Sessionende hat sich verschoben). Dann terminiert er **einmalig**
-einen neuen `f1-ingest-<key>`-Schedule auf `now + 30min` und beendet sich ohne
-Fehler. Beim zweiten 401 wird eine Metrik `IngestStillLive` emittiert, die
-alarmiert. Das braucht `scheduler:CreateSchedule` in der Ingest-Rolle — die
-einzige neue IAM-Berechtigung dieser Phase.
+Live-Fenster (ein überlaufendes Rennen schiebt `date_end` nach hinten). Der Lauf
+emittiert dann `IngestStillLive` und **wirft**. Die fehlgeschlagene Zustellung
+landet in der Ingest-Scheduler-DLQ und löst deren Alarm aus; ein Redrive holt die
+Daten nach, sobald sie frei sind.
+
+> **Umsetzungsentscheidung (abweichend vom ersten Entwurf):** ursprünglich sollte
+> sich der Lauf per `scheduler:CreateSchedule` selbst auf `now + 30min` neu
+> terminieren. Der DLQ-Weg ist besser: **keine neue IAM-Berechtigung**, und er
+> nutzt exakt das Instrument, das sich in diesem Projekt als einzig wirksames
+> erwiesen hat — die DLQ ist der Grund, warum der IAM-ARN-Bug überhaupt gefunden
+> wurde. Ein stiller Selbst-Retry hätte dasselbe Problem wie der ursprüngliche
+> Fehler: er passiert unsichtbar. Diese Phase fügt damit **null** neue
+> IAM-Rechte hinzu.
 
 ### 1.3 Was dadurch von selbst heilt
 

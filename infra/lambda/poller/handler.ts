@@ -49,6 +49,8 @@ export interface PollerSummary {
   succeeded: number;
   schema_failures: number;
   http_failures: number;
+  /** Subset of `http_failures` that were 401 — OpenF1's paid live window. */
+  unauthorized: number;
   endpoints: Record<OpenF1DataEndpoint, "ok" | "skipped" | "schema-fail" | "http-fail">;
 }
 
@@ -152,10 +154,41 @@ export async function pollSession(
   return summaries;
 }
 
+/**
+ * Phase 9 — one full-session ingest pass, replacing the live 5s poll loop.
+ *
+ * Runs once, 35min after the session ended, when OpenF1 has reclassified the
+ * data from "live" (paid) to "historical" (free). It fetches every endpoint
+ * exactly once and unconditionally — `weather` included, since there is no
+ * cadence to economise on any more — and the payload it gets is the complete,
+ * final session rather than a 5s snapshot.
+ *
+ * `still_live` is the one condition worth reacting to: HTTP 401 means the
+ * session's free window has not opened yet (an overrunning session pushes
+ * `date_end` back), so the caller re-arms itself once instead of losing the
+ * data (spec R-1). Any other failure is left to the normal retry/DLQ path.
+ */
+export interface IngestSummary extends PollerSummary {
+  /** True if any endpoint answered 401 — the session is still in the paid window. */
+  still_live: boolean;
+}
+
+export async function ingestSession(
+  event: PollerEvent,
+  deps: PollerDeps,
+  deadlineMs?: number,
+): Promise<IngestSummary> {
+  const summary = await pollOnce(event, deps, deadlineMs, { allEndpoints: true });
+  const still_live = summary.unauthorized > 0;
+  if (still_live) deps.emitMetric("IngestStillLive", 1, { session: String(event.session_key) });
+  return { ...summary, still_live };
+}
+
 export async function pollOnce(
   event: PollerEvent,
   deps: PollerDeps,
   deadlineMs?: number,
+  opts?: { allEndpoints?: boolean },
 ): Promise<PollerSummary> {
   const now = deps.now();
   const fetched_at = now.toISOString();
@@ -167,6 +200,7 @@ export async function pollOnce(
     succeeded: 0,
     schema_failures: 0,
     http_failures: 0,
+    unauthorized: 0,
     endpoints: {
       position: "skipped",
       intervals: "skipped",
@@ -176,7 +210,9 @@ export async function pollOnce(
     },
   };
 
-  const pollWeather = shouldPollWeather(now);
+  // A full-session ingest takes every endpoint; the legacy tick loop throttles
+  // weather to one fetch per 30s window.
+  const pollWeather = opts?.allEndpoints === true || shouldPollWeather(now);
 
   for (const endpoint of OPENF1_DATA_ENDPOINTS) {
     if (endpoint === "weather" && !pollWeather) continue;
@@ -187,6 +223,10 @@ export async function pollOnce(
     if (result.kind !== "ok") {
       summary.endpoints[endpoint] = "http-fail";
       summary.http_failures += 1;
+      // 401 is not a generic failure: it means OpenF1 still considers this
+      // session live, i.e. paid-tier only. Counted separately so the ingest
+      // path can re-arm rather than silently archiving nothing.
+      if (result.status === 401) summary.unauthorized += 1;
       deps.emitMetric("PollerHttpFailure", 1, { endpoint, status: String(result.status ?? "n/a") });
       continue;
     }

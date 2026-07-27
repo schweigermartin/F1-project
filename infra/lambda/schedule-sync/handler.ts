@@ -2,28 +2,32 @@ import { isSessionActive, type Session, SessionSchema } from "@f1/shared";
 
 /**
  * Schedule-Sync — runs daily, programmes one EventBridge Schedule per
- * upcoming F1 session. Each schedule fires the Poller every 5 seconds
- * during a window of `[date_start - 15min, date_end + 30min]`.
+ * upcoming F1 session. Each schedule fires the Ingest λ exactly once, 35
+ * minutes after the session ends.
  *
- * Why one-shot-per-session schedules instead of a single rule with
- * enable/disable? aws-scheduler supports a `StartDate`/`EndDate` window
- * natively; no Lambda-side bookkeeping needed.
+ * Why *after* the session and not during it (Phase 9, D-1)? OpenF1 classifies
+ * data as "live" from 30min before a session starts until 30min after it ends
+ * and gates that window behind a paid tier. The previous design polled at 5s
+ * inside exactly that window with no credentials and got HTTP 401 on every
+ * single request — 15,289 of them during the 2026-07-26 race, zero successes,
+ * and consequently not one race archived all season. Outside the window the
+ * same data is free, final, and complete, so one pass replaces ~700 ticks.
  *
- * Idempotent — names schedules deterministically (`f1-poll-<session_key>`),
+ * Idempotent — names schedules deterministically (`f1-ingest-<session_key>`),
  * upserts via Create-or-Update.
  */
 
 const HORIZON_HOURS = 48;
-const PRE_START_MINUTES = 15;
-const POST_END_MINUTES = 30;
+/** Session data turns free 30min after `date_end`; +5min of headroom (R-1). */
+const INGEST_DELAY_MINUTES = 35;
 /** Inference runs once, T-60min before a race start (Phase 4 AC-1 / D5). */
 const INFERENCE_LEAD_MINUTES = 60;
 
-export interface ScheduleSpec {
+/** A one-shot schedule firing the Ingest λ once, after the session went free. */
+export interface IngestScheduleSpec {
   name: string;
   session_key: number;
-  startsAt: Date;
-  endsAt: Date;
+  runAt: Date;
 }
 
 /**
@@ -42,9 +46,9 @@ export interface InferenceScheduleSpec {
 
 export interface ScheduleSyncDeps {
   fetchSessions: () => Promise<unknown>;
-  /** Returns existing schedule names (both f1-poll-* and f1-infer-*). */
+  /** Existing schedule names across all three prefixes (incl. legacy f1-poll-*). */
   listExistingSchedules: () => Promise<string[]>;
-  upsertSchedule: (spec: ScheduleSpec) => Promise<void>;
+  upsertIngestSchedule: (spec: IngestScheduleSpec) => Promise<void>;
   upsertInferenceSchedule: (spec: InferenceScheduleSpec) => Promise<void>;
   deleteSchedule: (name: string) => Promise<void>;
   /** Active model version stamped into each inference schedule's input. */
@@ -54,18 +58,24 @@ export interface ScheduleSyncDeps {
 }
 
 export interface ScheduleSyncResult {
-  upserted: ScheduleSpec[];
+  upserted: IngestScheduleSpec[];
   deleted: string[];
   skipped: number;
   inferenceUpserted: InferenceScheduleSpec[];
   inferenceDeleted: string[];
 }
 
-export const SCHEDULE_NAME_PREFIX = "f1-poll-";
+export const INGEST_SCHEDULE_PREFIX = "f1-ingest-";
 export const INFERENCE_SCHEDULE_PREFIX = "f1-infer-";
+/**
+ * Pre-Phase-9 recurring poll schedules. Nothing creates these any more; the
+ * sweep deletes any it still finds so the changeover cleans up after itself.
+ * Removable once a full season has passed without one showing up.
+ */
+export const LEGACY_POLL_PREFIX = "f1-poll-";
 
 function scheduleNameFor(session_key: number): string {
-  return `${SCHEDULE_NAME_PREFIX}${session_key}`;
+  return `${INGEST_SCHEDULE_PREFIX}${session_key}`;
 }
 
 function isRace(session: Session): boolean {
@@ -113,14 +123,12 @@ function pickUpcomingSessions(sessions: Session[], now: Date): Session[] {
   });
 }
 
-function toSpec(session: Session): ScheduleSpec {
-  const start = new Date(session.date_start);
+function toIngestSpec(session: Session): IngestScheduleSpec {
   const end = new Date(session.date_end);
   return {
     name: scheduleNameFor(session.session_key),
     session_key: session.session_key,
-    startsAt: new Date(start.getTime() - PRE_START_MINUTES * 60 * 1000),
-    endsAt: new Date(end.getTime() + POST_END_MINUTES * 60 * 1000),
+    runAt: new Date(end.getTime() + INGEST_DELAY_MINUTES * 60 * 1000),
   };
 }
 
@@ -143,10 +151,14 @@ export async function syncSchedules(deps: ScheduleSyncDeps): Promise<ScheduleSyn
   if (skipped > 0) deps.emitMetric("SchemaValidationFailure", skipped, { stage: "schedule-sync" });
 
   const upcoming = pickUpcomingSessions(validated, now);
-  const upserted: ScheduleSpec[] = [];
+  const upserted: IngestScheduleSpec[] = [];
   for (const session of upcoming) {
-    const spec = toSpec(session);
-    await deps.upsertSchedule(spec);
+    const spec = toIngestSpec(session);
+    // aws-scheduler rejects a one-time `at()` in the past. A session that
+    // already went free before this run is handled by the backfill path, not
+    // by silently creating a schedule that can never fire.
+    if (spec.runAt <= now) continue;
+    await deps.upsertIngestSchedule(spec);
     upserted.push(spec);
   }
 
@@ -165,18 +177,24 @@ export async function syncSchedules(deps: ScheduleSyncDeps): Promise<ScheduleSyn
   // Sweep stale schedules of both kinds: a prefix-matching name that no longer
   // maps to a relevant session. Keeps the scheduler clean across the off-season
   // and after cancellations.
-  const wantedPoll = new Set(upserted.map((s) => s.name));
+  const wantedIngest = new Set(upserted.map((s) => s.name));
   const wantedInfer = new Set(inferenceUpserted.map((s) => s.name));
   const existing = await deps.listExistingSchedules();
   const deleted: string[] = [];
   const inferenceDeleted: string[] = [];
   for (const name of existing) {
-    if (name.startsWith(SCHEDULE_NAME_PREFIX)) {
-      if (wantedPoll.has(name)) continue;
-      // Don't kill a currently-running session window.
-      const key = Number(name.slice(SCHEDULE_NAME_PREFIX.length));
-      const stillRunning = validated.find((s) => s.session_key === key && isSessionActive(s, now));
-      if (stillRunning) continue;
+    if (name.startsWith(LEGACY_POLL_PREFIX)) {
+      // Pre-Phase-9 leftover: a recurring 5s poll window that can only ever
+      // produce 401s now. Delete unconditionally.
+      await deps.deleteSchedule(name);
+      deleted.push(name);
+    } else if (name.startsWith(INGEST_SCHEDULE_PREFIX)) {
+      if (wantedIngest.has(name)) continue;
+      // Keep a not-yet-fired ingest for a session that has already ended but
+      // whose free window hasn't opened — it self-deletes once it fires.
+      const key = Number(name.slice(INGEST_SCHEDULE_PREFIX.length));
+      const pending = validated.find((s) => s.session_key === key && toIngestSpec(s).runAt > now);
+      if (pending) continue;
       await deps.deleteSchedule(name);
       deleted.push(name);
     } else if (name.startsWith(INFERENCE_SCHEDULE_PREFIX)) {

@@ -37,16 +37,16 @@
 | T17 | `PositionChart.tsx` (visx, Boxenstopp-Marker, Top-10-Default + Fokusfahrer, Hover)                                  | ✅     | AC-5, R-4       |
 | T18 | `PaceChart.tsx` + `StintBar.tsx` (Zwei-Fahrer-Vergleich)                                                            | ✅     | AC-6            |
 | T19 | Einbindung in den Explorer: neues Panel bei Session `race`, degradiert sauber wenn keine Lap-Daten                  | ✅     | AC-5, AC-11     |
-| T20 | `getArchivedSessions()` (S3-Listing, server-seitig) + `ReplayPicker` in `ReplayControls.tsx`, Textfeld als Fallback | ⬜     | plan §3.3, AC-7 |
-| T21 | `/live` off-season: zuletzt archiviertes Rennen vorgeladen statt „Waiting for session data…"                        | ⬜     | AC-8            |
-| T22 | `live.module.css` — hartkodierte Hex-Werte durch `@f1/shared`-Tokens ersetzen; Smoke bleibt grün                    | ⬜     | AC-10           |
+| T20 | `getArchivedSessions()` (S3-Listing, server-seitig) + `ReplayPicker` in `ReplayControls.tsx`, Textfeld als Fallback | ✅     | plan §3.3, AC-7 |
+| T21 | `/live` off-season: zuletzt archiviertes Rennen vorgeladen statt „Waiting for session data…"                        | ✅     | AC-8            |
+| T22 | `live.module.css` — hartkodierte Hex-Werte durch `@f1/shared`-Tokens ersetzen; Smoke bleibt grün                    | ✅     | AC-10           |
 
 ## Abschluss
 
 | #   | Task                                                                                             | Status | Verweis |
 | --- | ------------------------------------------------------------------------------------------------ | ------ | ------- |
 | T23 | Playwright-Smokes: Prediction-Archiv, Positionsverlauf, Replay-Picker                            | ⬜     | DoD     |
-| T24 | README: Architektur-Grafik + ehrliche Beschreibung „Post-Session-Ingest" statt „5s-Live-Polling" | ⬜     | XII     |
+| T24 | README: Architektur-Grafik + ehrliche Beschreibung „Post-Session-Ingest" statt „5s-Live-Polling" | ✅     | XII     |
 | T25 | Close-out: Gate grün, Spec-Status `done`, Merge nach `main`, `git tag phase-9-done`              | ⬜     | DoD     |
 
 ## Offene Notizen

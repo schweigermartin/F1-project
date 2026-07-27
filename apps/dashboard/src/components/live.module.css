@@ -1,0 +1,406 @@
+/* Scoped styling for /live (Phase 9, T22, AC-10). Replaces the inline
+   `style={{}}` objects and hardcoded hex values (#0e131b, #11161f, #2a3242,
+   #0a0e14, …) that predate the shared design system. Everything here resolves
+   through the @f1/shared tokens injected into :root, so the live page speaks the
+   same visual language as season.module.css and explorer.module.css.
+
+   Presentation only — no class in this file carries behaviour, and the DOM
+   structure, ARIA labels and roles the Playwright smoke selects on are
+   unchanged. */
+
+/* ── Page shell ──────────────────────────────────────────────────────────── */
+.page {
+  padding: var(--space-2xl) var(--space-lg) 4rem;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+.headerLeft {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0;
+  background: linear-gradient(96deg, #ffffff 18%, var(--accent-soft) 58%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.navLink {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+.navLink:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+  background: rgba(225, 6, 0, 0.08);
+}
+
+/* ── Connection status ───────────────────────────────────────────────────── */
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.82rem;
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+}
+.dotOpen {
+  background: var(--pos);
+}
+.dotPending {
+  background: var(--warn);
+}
+.dotClosed {
+  background: var(--muted);
+}
+.statusText {
+  color: var(--muted);
+}
+.mode {
+  margin-left: var(--space-xs);
+  padding: 0.1rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  text-transform: uppercase;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.modeReplay {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Weather strip ───────────────────────────────────────────────────────── */
+.weather {
+  display: flex;
+  gap: var(--space-xl);
+  flex-wrap: wrap;
+  padding: var(--space-md) var(--space-lg);
+  background: linear-gradient(180deg, var(--surface), var(--bg));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.metric {
+  display: flex;
+  flex-direction: column;
+  min-width: 64px;
+}
+.metricLabel {
+  color: var(--muted);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+.metricValue {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Replay controls ─────────────────────────────────────────────────────── */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  margin-top: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  background: linear-gradient(180deg, var(--surface), var(--bg));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.controlsLabel {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-weight: 700;
+}
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.fieldHint {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.select {
+  appearance: none;
+  max-width: 22rem;
+  background: var(--surface-2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.4rem 2rem 0.4rem 0.7rem;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    right 0.95rem center,
+    right 0.65rem center;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color 0.15s;
+}
+.select:hover,
+.select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.input {
+  width: 8rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.82rem;
+  font-family: var(--font-mono);
+  transition: border-color 0.15s;
+}
+.input:hover,
+.input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.speeds {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+}
+.speed {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.speed:hover {
+  color: var(--fg);
+}
+.speedActive {
+  background: var(--accent);
+  color: #fff;
+}
+.action {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition:
+    filter 0.15s,
+    opacity 0.15s;
+}
+.action:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+.action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.note {
+  color: var(--muted);
+  font-size: 0.78rem;
+  flex-basis: 100%;
+}
+
+/* ── Panels ──────────────────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-lg);
+  margin-top: var(--space-lg);
+}
+@media (max-width: 860px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+.card {
+  background: linear-gradient(180deg, var(--surface), var(--bg));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-lg) var(--space-xl);
+  min-width: 0;
+}
+.cardTitle {
+  font-family: var(--font-display);
+  margin: 0 0 var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+
+/* ── Timing tower ────────────────────────────────────────────────────────── */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.table th {
+  text-align: left;
+  padding: 0.35rem 0.6rem;
+  color: var(--muted);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.table td {
+  padding: 0.45rem 0.6rem;
+  border-top: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.table tbody tr {
+  transition: background 0.12s;
+}
+.table tbody tr:hover {
+  background: var(--surface-2);
+}
+.colPos {
+  width: 2.2rem;
+  font-weight: 800;
+}
+.tyre {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+/* The ring colour is the compound's own (tyreInfo) — data, not theme — so it
+   stays an inline style; everything around it comes from the tokens. */
+.tyreDot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border-width: 2px;
+  border-style: solid;
+  font-size: 0.62rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tyreAge {
+  color: var(--muted);
+}
+
+/* ── Gap chart (SVG — `fill` is the colour property here) ────────────────── */
+.chartLabel {
+  font-size: 11px;
+  fill: var(--fg);
+}
+.chartValue {
+  font-size: 10px;
+  fill: var(--muted);
+}
+.bar {
+  fill: var(--accent);
+}
+.barLapped {
+  fill: var(--muted);
+}
+
+/* ── Off-season / no-session state (AC-8) ────────────────────────────────── */
+.offline {
+  margin-top: var(--space-lg);
+  padding: var(--space-xl);
+  background:
+    radial-gradient(120% 160% at 100% 0%, rgba(225, 6, 0, 0.14), transparent 55%),
+    linear-gradient(180deg, var(--surface), var(--bg));
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+.offlineKicker {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  font-weight: 700;
+}
+.offlineTitle {
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 3vw, 1.7rem);
+  font-weight: 800;
+  margin: var(--space-xs) 0 var(--space-sm);
+}
+.offlineText {
+  margin: 0 0 var(--space-lg);
+  color: var(--muted);
+  max-width: 62ch;
+  line-height: 1.6;
+}
+.offlineActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.offlineSession {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.offlineFooter {
+  margin-top: var(--space-lg);
+}

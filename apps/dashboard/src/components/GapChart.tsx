@@ -4,6 +4,7 @@ import { Bar } from "@visx/shape";
 import type { ReactNode } from "react";
 
 import type { GapBar } from "../lib/format";
+import styles from "./live.module.css";
 
 const W = 640;
 const ROW = 26;
@@ -35,24 +36,25 @@ export function GapChart({ bars }: { bars: GapBar[] }): ReactNode {
           return (
             <Group key={b.driver_number}>
               <text
+                className={styles.chartLabel}
                 x={-8}
                 y={barY + bh / 2}
                 dy="0.32em"
                 textAnchor="end"
-                fontSize={11}
-                fill="#e6e6e6"
               >
                 #{b.driver_number}
               </text>
+              {/* SVG colours come from the module too — `fill` is set by the
+                  class, so no hex leaks back in here (AC-10). */}
               <Bar
+                className={(b.lapped ? styles.barLapped : styles.bar) ?? ""}
                 x={0}
                 y={barY}
                 width={barW}
                 height={bh}
                 rx={3}
-                fill={b.lapped ? "#5a6473" : "var(--accent)"}
               />
-              <text x={barW + 6} y={barY + bh / 2} dy="0.32em" fontSize={10} fill="#8a94a6">
+              <text className={styles.chartValue} x={barW + 6} y={barY + bh / 2} dy="0.32em">
                 {b.lapped ? "+1 LAP" : `+${b.gapSeconds.toFixed(1)}s`}
               </text>
             </Group>

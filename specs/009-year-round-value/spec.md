@@ -1,7 +1,7 @@
 # Spec: Year-Round Value — Post-Session Ingest, Prediction Archive, Race Analysis
 
 > **Phase:** 009
-> **Status:** draft — awaiting review
+> **Status:** implemented — T1–T6, T9–T22, T24 gebaut + getestet (Gate grün, 504 Tests, CI grün), PR #1 gemerged nach `main`, `F1-Pipeline` + `F1-Inference` am 2026-07-27 deployt (IAM-Grant per `simulate-principal-policy` = ALLOWED, alle 15 Alarme OK). **Noch nicht `done`:** T7 verlangt eine echte Session — AC-2 (Race-Archiv in S3) und AC-3 (Feedback-Loop schreibt einen Record, `?season=` nicht leer) sind erst am Rennwochenende Zandvoort (Runde 12, 2026-08-23) prüfbar. Tag `phase-9-done` erst danach. Offen ausserdem: T2, T8, T23.
 > **Owner:** Martin
 > **Constitution:** II (jede Phase liefert Vorzeigbares), III (geteilte Basis), IV (Kostenkontrolle — dieser Phase _senkt_ die Kosten), V (**Demo muss jederzeit funktionieren** — der Kern dieser Phase), VI (Zod an allen Grenzen), VIII (Observability), X (pragmatische Tests), XII (README aktuell).
 

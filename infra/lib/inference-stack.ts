@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import { ARCHIVER_EVENT_SOURCE, PK_ATTR, SESSION_ARCHIVED_DETAIL_TYPE, SK_ATTR } from "@f1/shared";
 import {
+  ArnFormat,
   CfnOutput,
   Duration,
   RemovalPolicy,
@@ -218,11 +219,18 @@ export class InferenceStack extends Stack {
             new iam.PolicyStatement({
               actions: ["lambda:InvokeFunction"],
               // Build from the known name (not functionArn) to avoid a role↔fn cycle.
+              // Lambda ARNs separate the function name with a COLON
+              // (`function:F1-Inference`). formatArn defaults to
+              // SLASH_RESOURCE_NAME, which yielded `function/F1-Inference` — a
+              // resource that never matches, so every scheduler→λ delivery died
+              // with AccessDeniedException and no prediction ran from round 8
+              // (2026-06-28) until this fix. See the regression test below.
               resources: [
                 Stack.of(this).formatArn({
                   service: "lambda",
                   resource: "function",
                   resourceName: INFERENCE_FN_NAME,
+                  arnFormat: ArnFormat.COLON_RESOURCE_NAME,
                 }),
               ],
             }),

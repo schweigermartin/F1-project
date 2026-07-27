@@ -21,22 +21,22 @@
 
 | #   | Task                                                                                                         | Status | Verweis         |
 | --- | ------------------------------------------------------------------------------------------------------------ | ------ | --------------- |
-| T9  | `lib/schedule.ts` + neue `resolveRound`-Logik (pure): `?round=N` auflösen, Default nächstes/letztes; Tests   | ⬜     | plan §2.1, AC-4 |
-| T10 | `RoundSelector.tsx` (Client, `router.push`) + Einbindung in `page.tsx` via `searchParams`                    | ⬜     | AC-4            |
-| T11 | Vorhersage-vs-Realität: Jolpica-Ergebnis des gewählten Rennens laden, Treffer-Markierung pro Position; Tests | ⬜     | plan §2.2, AC-4 |
-| T12 | Demo-Modus auf den Vorhersage-Teil eingrenzen — Wetter/Kalender/Standings/Historie immer live                | ⬜     | plan §2.3       |
-| T13 | Bedrock-Begründung des Top-1-Fahrers standardmäßig offen                                                     | ⬜     | AC-9            |
+| T9  | `lib/schedule.ts` + neue `resolveRound`-Logik (pure): `?round=N` auflösen, Default nächstes/letztes; Tests   | ✅     | plan §2.1, AC-4 |
+| T10 | `RoundSelector.tsx` (Client, `router.push`) + Einbindung in `page.tsx` via `searchParams`                    | ✅     | AC-4            |
+| T11 | Vorhersage-vs-Realität: Jolpica-Ergebnis des gewählten Rennens laden, Treffer-Markierung pro Position; Tests | ✅     | plan §2.2, AC-4 |
+| T12 | Demo-Modus auf den Vorhersage-Teil eingrenzen — Wetter/Kalender/Standings/Historie immer live                | ✅     | plan §2.3       |
+| T13 | Bedrock-Begründung des Top-1-Fahrers standardmäßig offen                                                     | ✅     | AC-9            |
 
 ## Strang C — Rennanalyse + Replay (apps/dashboard)
 
 | #   | Task                                                                                                                | Status | Verweis         |
 | --- | ------------------------------------------------------------------------------------------------------------------- | ------ | --------------- |
-| T14 | `@f1/shared`: `JolpicaLapsSchema` + `JolpicaPitStopsSchema` inkl. Pagination-Felder + Tests                         | ⬜     | plan §4, R-2    |
-| T15 | `lib/race-progression.ts`: `getLapChart` (paginiert bis `total`) + `getPitStops`, Zod, ISR; Tests                   | ⬜     | plan §3.1, AC-5 |
-| T16 | Pure Transformationen `toPositionSeries` / `toPaceSeries` (MAD-Ausreißerdämpfung) / `toStints` + Tests              | ⬜     | plan §3.1, AC-6 |
-| T17 | `PositionChart.tsx` (visx, Boxenstopp-Marker, Top-10-Default + Fokusfahrer, Hover)                                  | ⬜     | AC-5, R-4       |
-| T18 | `PaceChart.tsx` + `StintBar.tsx` (Zwei-Fahrer-Vergleich)                                                            | ⬜     | AC-6            |
-| T19 | Einbindung in den Explorer: neues Panel bei Session `race`, degradiert sauber wenn keine Lap-Daten                  | ⬜     | AC-5, AC-11     |
+| T14 | `@f1/shared`: `JolpicaLapsSchema` + `JolpicaPitStopsSchema` inkl. Pagination-Felder + Tests                         | ✅     | plan §4, R-2    |
+| T15 | `lib/race-progression.ts`: `getLapChart` (paginiert bis `total`) + `getPitStops`, Zod, ISR; Tests                   | ✅     | plan §3.1, AC-5 |
+| T16 | Pure Transformationen `toPositionSeries` / `toPaceSeries` (MAD-Ausreißerdämpfung) / `toStints` + Tests              | ✅     | plan §3.1, AC-6 |
+| T17 | `PositionChart.tsx` (visx, Boxenstopp-Marker, Top-10-Default + Fokusfahrer, Hover)                                  | ✅     | AC-5, R-4       |
+| T18 | `PaceChart.tsx` + `StintBar.tsx` (Zwei-Fahrer-Vergleich)                                                            | ✅     | AC-6            |
+| T19 | Einbindung in den Explorer: neues Panel bei Session `race`, degradiert sauber wenn keine Lap-Daten                  | ✅     | AC-5, AC-11     |
 | T20 | `getArchivedSessions()` (S3-Listing, server-seitig) + `ReplayPicker` in `ReplayControls.tsx`, Textfeld als Fallback | ⬜     | plan §3.3, AC-7 |
 | T21 | `/live` off-season: zuletzt archiviertes Rennen vorgeladen statt „Waiting for session data…"                        | ⬜     | AC-8            |
 | T22 | `live.module.css` — hartkodierte Hex-Werte durch `@f1/shared`-Tokens ersetzen; Smoke bleibt grün                    | ⬜     | AC-10           |

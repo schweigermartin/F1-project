@@ -14,25 +14,20 @@ import { WeatherPanel } from "../components/weather/WeatherPanel";
 import { SessionTimeline } from "../components/weekend/SessionTimeline";
 import { WeekendHeader } from "../components/weekend/WeekendHeader";
 import { type CircuitPath, getCircuitPath } from "../lib/circuits";
-import {
-  DEMO_CIRCUIT_PATH,
-  DEMO_FINAL_TOP3,
-  DEMO_FORECAST,
-  DEMO_GRID,
-  DEMO_PREDICTIONS,
-  DEMO_RACE,
-  DEMO_SEASON_EVALUATIONS,
-  DEMO_SESSIONS,
-  DEMO_STANDINGS,
-  DEMO_WINNERS,
-} from "../lib/demo-data";
+import { DEMO_FINAL_TOP3, DEMO_PREDICTIONS, DEMO_SEASON_EVALUATIONS } from "../lib/demo-data";
 import { fetchSeasonEvaluations } from "../lib/evaluations-api";
 import { getTrackWinners, type TrackWinner } from "../lib/history-api";
 import type { ActualSlot } from "../lib/live-diff";
 import { getWeekendSessions } from "../lib/openf1-weekend";
 import { fetchRacePredictions, sortByPodium } from "../lib/predictions-api";
 import { getQualifyingGrid, type GridSlot } from "../lib/quali-api";
-import { getSeasonSchedule, pickTargetRace, type ScheduledRace } from "../lib/schedule";
+import { getRaceResult } from "../lib/race-result-api";
+import {
+  getSeasonSchedule,
+  raceHasHappened,
+  resolveRound,
+  type ScheduledRace,
+} from "../lib/schedule";
 import { pickNextSession } from "../lib/session-format";
 import { type DriverStanding, getDriverStandings } from "../lib/standings-api";
 import { getRaceDayForecast, type RaceDayForecast } from "../lib/weather-api";
@@ -40,20 +35,29 @@ import { getRaceDayForecast, type RaceDayForecast } from "../lib/weather-api";
 // ISR: re-resolve the weekend + its data every few minutes (cheap, free APIs).
 export const revalidate = 300;
 
+// T12: DEMO now scopes *only* the prediction/evaluation slice (plan §2.3) —
+// weather, schedule, circuit map, standings and track history need no
+// Read-API and always fetch live, whether or not one is configured.
 const DEMO = !process.env["NEXT_PUBLIC_PREDICTIONS_API_URL"];
+
+interface PageProps {
+  searchParams: Promise<{ round?: string | undefined }>;
+}
 
 /** allSettled helper: a rejected/each-failing source becomes `null`/`[]`. */
 function settled<T>(r: PromiseSettledResult<T>, fallback: T): T {
   return r.status === "fulfilled" ? r.value : fallback;
 }
 
-export default async function PredictorPage(): Promise<ReactNode> {
+export default async function PredictorPage({ searchParams }: PageProps): Promise<ReactNode> {
   const now = new Date();
-  const data = DEMO ? demoData() : await liveData(now);
+  const { round } = await searchParams;
+  const data = await liveData(now, round);
   if (!data) return <EmptyShell />;
 
   const {
     race,
+    schedule,
     sessions,
     forecast,
     circuitPath,
@@ -79,11 +83,12 @@ export default async function PredictorPage(): Promise<ReactNode> {
     <main>
       {DEMO ? (
         <p className={hub.kicker} style={{ textAlign: "center", marginBottom: "1rem" }}>
-          Demo-Daten — keine Read-API konfiguriert
+          Demo-Vorhersage — keine Read-API konfiguriert (Wetter, Kalender, Strecke und Historie sind
+          live)
         </p>
       ) : null}
 
-      <WeekendHeader race={race} nextSession={nextSession} />
+      <WeekendHeader race={race} nextSession={nextSession} schedule={schedule} />
 
       <div className={hub.grid}>
         <CircuitMap path={circuitPath} circuitName={race.circuit} accent={leaderTeamAccent} />
@@ -91,6 +96,7 @@ export default async function PredictorPage(): Promise<ReactNode> {
         <WeatherPanel forecast={forecast} />
 
         <PodiumBoard
+          key={race.round}
           response={predictions}
           raceName={race.name}
           raceDate={race.date}
@@ -116,6 +122,8 @@ export default async function PredictorPage(): Promise<ReactNode> {
 
 interface HubData {
   race: ScheduledRace;
+  /** Full season schedule — powers the round selector (T10/AC-4). */
+  schedule: ScheduledRace[];
   sessions: Session[];
   forecast: RaceDayForecast | null;
   circuitPath: CircuitPath | null;
@@ -128,29 +136,22 @@ interface HubData {
   liveSessionKey: number | null;
 }
 
-function demoData(): HubData {
-  return {
-    race: DEMO_RACE,
-    sessions: DEMO_SESSIONS,
-    forecast: DEMO_FORECAST,
-    circuitPath: DEMO_CIRCUIT_PATH,
-    winners: DEMO_WINNERS,
-    standings: DEMO_STANDINGS,
-    grid: DEMO_GRID,
-    predictions: DEMO_PREDICTIONS,
-    seasonEvaluations: DEMO_SEASON_EVALUATIONS,
-    finalTop3: DEMO_FINAL_TOP3,
-    liveSessionKey: null,
-  };
-}
-
-async function liveData(now: Date): Promise<HubData | null> {
-  const schedule = await getSeasonSchedule();
-  const race = schedule ? pickTargetRace(schedule, now) : null;
+/**
+ * Resolves the selected round (`?round=N`, default next-or-last, T9) and
+ * fetches every panel's data. Per T12, only `predictions`/`seasonEvaluations`/
+ * `finalTop3` fall back to demo fixtures when no Read-API is configured —
+ * everything else (schedule, weather, circuit, standings, history) needs no
+ * env var and always hits the free live APIs, demo mode or not (plan §2.3).
+ */
+async function liveData(now: Date, roundParam: string | undefined): Promise<HubData | null> {
+  const schedule = (await getSeasonSchedule()) ?? [];
+  const race = schedule.length > 0 ? resolveRound(roundParam, schedule, now) : null;
   if (!race) return null;
   const season = Number(race.date.slice(0, 4));
+  // T11: only bother asking Jolpica for a result once the race can have one.
+  const raceHappened = raceHasHappened(race.date, now);
 
-  const [sessionsR, forecastR, circuitR, winnersR, standingsR, gridR, predR, evalR] =
+  const [sessionsR, forecastR, circuitR, winnersR, standingsR, gridR, predR, evalR, resultR] =
     await Promise.allSettled([
       getWeekendSessions({ date: race.date, ...(race.country ? { country: race.country } : {}) }),
       race.lat !== undefined && race.lon !== undefined
@@ -163,23 +164,30 @@ async function liveData(now: Date): Promise<HubData | null> {
       race.circuitId ? getTrackWinners(race.circuitId) : Promise.resolve(null),
       getDriverStandings(),
       getQualifyingGrid(season, race.round),
-      fetchRacePredictions(race.date, race.round),
-      fetchSeasonEvaluations(season),
+      DEMO ? Promise.resolve(DEMO_PREDICTIONS) : fetchRacePredictions(race.date, race.round),
+      DEMO ? Promise.resolve(DEMO_SEASON_EVALUATIONS) : fetchSeasonEvaluations(season),
+      // T11: fetch the real Jolpica result directly — independent of whether
+      // the Phase-5 evaluation pipeline has run for this race yet.
+      !DEMO && raceHappened ? getRaceResult(season, race.round) : Promise.resolve(null),
     ]);
 
   const sessions = settled(sessionsR, [] as Session[]);
   const seasonEvaluations = settled(evalR, null);
-  // Reuse the season evaluation's actual_top3 for this round as the final result
-  // (no extra fetch — the loop already computed it).
+  const jolpicaResult = settled(resultR, null);
+  // Fall back to the season evaluation's actual_top3 for this round if the
+  // direct Jolpica fetch failed or hasn't run — both describe the same
+  // finished race, so either is a valid source (AC-11 degrade).
   const thisRaceEval = seasonEvaluations?.races.find((r) => r.round === race.round) ?? null;
-  const finalTop3: ActualSlot[] | null = thisRaceEval
+  const evalTop3: ActualSlot[] | null = thisRaceEval
     ? thisRaceEval.actual_top3.map((d) => ({ position: d.position, code: d.driver_code }))
     : null;
+  const finalTop3: ActualSlot[] | null = DEMO ? DEMO_FINAL_TOP3 : (jolpicaResult ?? evalTop3);
   // Live only while an actual Race session is open (Constitution IV).
   const liveRace = sessions.find((s) => s.session_type === "Race" && isSessionActive(s, now));
 
   return {
     race,
+    schedule,
     sessions,
     forecast: settled(forecastR, null),
     circuitPath: settled(circuitR, null),

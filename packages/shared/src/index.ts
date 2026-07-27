@@ -4,6 +4,7 @@ export * from "./ddb-keys.js";
 export * from "./design-tokens.js";
 export * from "./evaluation-schema.js";
 export * from "./event-schema.js";
+export * from "./jolpica-schema.js";
 export * from "./openf1-schema.js";
 export * from "./prediction-schema.js";
 export * from "./s3-layout.js";

@@ -1,0 +1,407 @@
+/* Race-analysis charts (Phase 9, AC-5/AC-6). Same visual language as
+   season.module.css / explorer.module.css — every colour, radius and spacing
+   comes from the shared @f1/shared tokens; the only literal colours in this
+   feature are the team colours, which are data from @f1/shared, not styling. */
+
+/* ── Shared chart chrome ─────────────────────────────────────────────────── */
+.chartWrap {
+  position: relative;
+  width: 100%;
+}
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  touch-action: pan-y;
+}
+.gridLine {
+  stroke: var(--border);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+.gridLineFaint {
+  stroke: var(--border);
+  stroke-width: 1;
+  opacity: 0.25;
+}
+.axisLabel {
+  fill: var(--muted);
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+.axisTitle {
+  fill: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.endLabel {
+  font-size: 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.guide {
+  stroke: var(--fg);
+  stroke-width: 1;
+  opacity: 0.35;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+}
+.hitArea {
+  fill: transparent;
+  cursor: crosshair;
+}
+.line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.lineMuted {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1.25;
+  opacity: 0.5;
+}
+.pitMarker {
+  stroke: var(--bg);
+  stroke-width: 1;
+}
+.dot {
+  stroke: var(--bg);
+  stroke-width: 1.5;
+}
+/* Pace points sit ON the trace, so they carry no background ring — a ring
+   would cut the line into beads at every lap. Neither class declares a colour:
+   a CSS `stroke`/`fill` beats the presentation attribute, and the team colour
+   arrives as an attribute. */
+.point {
+  stroke: none;
+}
+.pointOutlier {
+  fill: none;
+  stroke-width: 1.2;
+}
+.medianLine {
+  stroke-width: 1;
+  opacity: 0.5;
+}
+
+/* ── Hover tooltip ───────────────────────────────────────────────────────── */
+.tooltip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  min-width: 8.5rem;
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(10, 14, 20, 0.94);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  pointer-events: none;
+  z-index: 5;
+}
+.tooltipHead {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  margin-bottom: var(--space-xs);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--border);
+}
+.tooltipRow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.tooltipPos {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  width: 1.6rem;
+  text-align: right;
+}
+.tooltipCode {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+.tooltipSwatch {
+  width: 3px;
+  height: 11px;
+  border-radius: 2px;
+  flex: none;
+}
+.tooltipPit {
+  color: var(--warn);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+/* ── Driver toggles (R-4: top-10 by default, rest opt-in) ────────────────── */
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.22rem 0.5rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  opacity: 0.55;
+  transition:
+    opacity 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.1s;
+}
+.toggle:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+.toggleOn {
+  color: var(--fg);
+  opacity: 1;
+}
+.toggleFocus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.toggleSwatch {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.toggleActions {
+  display: inline-flex;
+  gap: var(--space-xs);
+  margin-left: auto;
+}
+.action {
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.22rem 0.6rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.action:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
+/* ── Pace chart controls + stats ─────────────────────────────────────────── */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md) var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+.controlGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.controlLabel {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-weight: 700;
+}
+.select {
+  appearance: none;
+  background: var(--surface-2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.35rem 1.9rem 0.35rem 0.65rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    right 0.9rem center,
+    right 0.6rem center;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color 0.15s;
+}
+.select:hover,
+.select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md) var(--space-xl);
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+.statBlock {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.statSwatch {
+  width: 4px;
+  align-self: stretch;
+  border-radius: 2px;
+  flex: none;
+}
+.statCode {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 800;
+}
+.statPair {
+  display: flex;
+  flex-direction: column;
+}
+.statVal {
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+.statLabel {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.note {
+  margin: var(--space-md) 0 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+/* ── Stint bars ──────────────────────────────────────────────────────────── */
+.stints {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.stintRuler {
+  display: flex;
+  justify-content: space-between;
+  margin-left: 3.6rem;
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-sm);
+}
+.stintTick {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--muted);
+}
+.stintRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.stintRowFocus .stintCode {
+  color: var(--accent);
+}
+.stintCode {
+  width: 3rem;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.stintTrack {
+  display: flex;
+  flex: 1;
+  gap: 2px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.stintSeg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2px;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--bg);
+  white-space: nowrap;
+  transition: filter 0.15s;
+}
+.stintSeg:hover {
+  filter: brightness(1.18);
+}
+.stintCount {
+  width: 1.6rem;
+  flex: none;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--muted);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  padding: var(--space-md) 0;
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  /* A 980-unit chart squeezed into 360 CSS pixels renders 4px axis labels.
+     Keep the geometry and let the panel scroll sideways instead. */
+  .chartWrap {
+    overflow-x: auto;
+  }
+  .chart {
+    min-width: 640px;
+  }
+}
+
+@media (max-width: 640px) {
+  .stintCode {
+    width: 2.4rem;
+  }
+  .stintRuler {
+    margin-left: 3rem;
+  }
+}

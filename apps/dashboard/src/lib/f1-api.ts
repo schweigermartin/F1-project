@@ -34,6 +34,9 @@ async function fetchJolpica<T>(path: string, schema: z.ZodType<T>): Promise<T | 
 // ─── Raw Jolpica/Ergast envelope schemas (only the fields we use) ────────────
 
 const DriverSchema = z.object({
+  // Ergast's stable slug ("max_verstappen") — the join key against /laps and
+  // /pitstops, which identify drivers by nothing else (Phase 9).
+  driverId: z.string().optional(),
   givenName: z.string(),
   familyName: z.string(),
   code: z.string().optional(),
@@ -163,6 +166,8 @@ export interface RaceResultRow {
   position: number;
   driver: string;
   code: string;
+  /** Ergast slug — joins this row to the lap/pit-stop records (Phase 9). */
+  driverId?: string;
   constructor: string;
   points: string;
   grid?: string;
@@ -241,6 +246,7 @@ export async function getLastResults(): Promise<LastRace | null> {
       position: Number(r.position),
       driver: `${r.Driver.givenName} ${r.Driver.familyName}`,
       code: r.Driver.code ?? r.Driver.familyName.slice(0, 3).toUpperCase(),
+      ...(r.Driver.driverId ? { driverId: r.Driver.driverId } : {}),
       constructor: r.Constructor.name,
       points: r.points,
       ...(r.grid ? { grid: r.grid } : {}),
@@ -280,6 +286,7 @@ export async function getRaceResults(
     position: Number(r.position),
     driver: `${r.Driver.givenName} ${r.Driver.familyName}`,
     code: r.Driver.code ?? r.Driver.familyName.slice(0, 3).toUpperCase(),
+    ...(r.Driver.driverId ? { driverId: r.Driver.driverId } : {}),
     constructor: r.Constructor.name,
     points: r.points,
     ...(r.grid ? { grid: r.grid } : {}),

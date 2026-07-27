@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   INFERENCE_SCHEDULE_PREFIX,
-  SCHEDULE_NAME_PREFIX,
+  INGEST_SCHEDULE_PREFIX,
+  LEGACY_POLL_PREFIX,
   type ScheduleSyncDeps,
   syncSchedules,
 } from "../handler.js";
@@ -41,7 +42,7 @@ function makeMocks(opts: { sessions: unknown; existing?: string[] }): {
 } {
   const fetchSessions = vi.fn(async () => opts.sessions);
   const listExistingSchedules = vi.fn(async () => opts.existing ?? []);
-  const upsertSchedule = vi.fn(async () => {});
+  const upsertIngestSchedule = vi.fn(async () => {});
   const upsertInferenceSchedule = vi.fn(async () => {});
   const deleteSchedule = vi.fn(async () => {});
   const emitMetric = vi.fn();
@@ -49,7 +50,7 @@ function makeMocks(opts: { sessions: unknown; existing?: string[] }): {
     mocks: {
       fetchSessions,
       listExistingSchedules,
-      upsertSchedule,
+      upsertIngestSchedule,
       upsertInferenceSchedule,
       deleteSchedule,
       emitMetric,
@@ -57,7 +58,7 @@ function makeMocks(opts: { sessions: unknown; existing?: string[] }): {
     deps: {
       fetchSessions,
       listExistingSchedules,
-      upsertSchedule,
+      upsertIngestSchedule,
       upsertInferenceSchedule,
       deleteSchedule,
       modelVersion: "0.1.0",
@@ -70,7 +71,7 @@ function makeMocks(opts: { sessions: unknown; existing?: string[] }): {
 describe("syncSchedules — upserts upcoming sessions", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("creates schedules for sessions inside the 48h horizon, with ±buffer windows", async () => {
+  it("creates one ingest schedule per session, 35min after it ends", async () => {
     const m = makeMocks({
       sessions: [
         makeSession({
@@ -88,10 +89,29 @@ describe("syncSchedules — upserts upcoming sessions", () => {
     const result = await syncSchedules(m.deps);
 
     expect(result.upserted).toHaveLength(1);
-    expect(result.upserted[0]!.name).toBe(`${SCHEDULE_NAME_PREFIX}11291`);
-    expect(result.upserted[0]!.startsAt.toISOString()).toBe("2026-05-24T19:45:00.000Z");
-    expect(result.upserted[0]!.endsAt.toISOString()).toBe("2026-05-24T22:30:00.000Z");
-    expect(m.mocks["upsertSchedule"]).toHaveBeenCalledTimes(1);
+    expect(result.upserted[0]!.name).toBe(`${INGEST_SCHEDULE_PREFIX}11291`);
+    // OpenF1 keeps data "live" (= paid) until 30min after date_end; +5min
+    // headroom. Polling *inside* that window is what produced 15,289 HTTP 401s
+    // and an empty archive for the whole 2026 season.
+    expect(result.upserted[0]!.runAt.toISOString()).toBe("2026-05-24T22:35:00.000Z");
+    expect(m.mocks["upsertIngestSchedule"]).toHaveBeenCalledTimes(1);
+  });
+
+  it("schedules a session that is still running — its ingest lands after the flag", async () => {
+    const m = makeMocks({
+      sessions: [
+        makeSession({
+          key: 11291,
+          start: "2026-05-23T11:00:00+00:00",
+          end: "2026-05-23T13:00:00+00:00",
+        }),
+      ],
+    });
+    m.deps.now = () => new Date("2026-05-23T12:00:00.000Z"); // mid-session
+    const result = await syncSchedules(m.deps);
+
+    expect(result.upserted).toHaveLength(1);
+    expect(result.upserted[0]!.runAt.toISOString()).toBe("2026-05-23T13:35:00.000Z");
   });
 
   it("skips cancelled sessions", async () => {
@@ -135,22 +155,40 @@ describe("syncSchedules — cleanup", () => {
         }),
       ],
       existing: [
-        `${SCHEDULE_NAME_PREFIX}11291`, // wanted
-        `${SCHEDULE_NAME_PREFIX}99999`, // stale, must be deleted
+        `${INGEST_SCHEDULE_PREFIX}11291`, // wanted
+        `${INGEST_SCHEDULE_PREFIX}99999`, // stale, must be deleted
         "unrelated-schedule", // not our prefix, must be left alone
       ],
     });
     const result = await syncSchedules(m.deps);
-    expect(result.deleted).toEqual([`${SCHEDULE_NAME_PREFIX}99999`]);
-    expect(m.mocks["deleteSchedule"]).toHaveBeenCalledWith(`${SCHEDULE_NAME_PREFIX}99999`);
+    expect(result.deleted).toEqual([`${INGEST_SCHEDULE_PREFIX}99999`]);
+    expect(m.mocks["deleteSchedule"]).toHaveBeenCalledWith(`${INGEST_SCHEDULE_PREFIX}99999`);
     expect(m.mocks["deleteSchedule"]).not.toHaveBeenCalledWith("unrelated-schedule");
+  });
+
+  it("sweeps legacy f1-poll-* schedules unconditionally (Phase 9 changeover)", async () => {
+    const m = makeMocks({
+      sessions: [
+        makeSession({
+          key: 11291,
+          start: "2026-05-24T20:00:00+00:00",
+          end: "2026-05-24T22:00:00+00:00",
+        }),
+      ],
+      // A leftover poll window for the very session we're now ingesting: it
+      // can only ever produce 401s, so it goes regardless of session state.
+      existing: [`${LEGACY_POLL_PREFIX}11291`, `${LEGACY_POLL_PREFIX}99999`],
+    });
+    const result = await syncSchedules(m.deps);
+
+    expect(result.deleted).toEqual([`${LEGACY_POLL_PREFIX}11291`, `${LEGACY_POLL_PREFIX}99999`]);
   });
 
   it("never deletes a schedule whose session is currently RUNNING", async () => {
     const now = new Date("2026-05-24T20:30:00.000Z"); // mid Montréal race
     const m = makeMocks({
       sessions: [],
-      existing: [`${SCHEDULE_NAME_PREFIX}11291`],
+      existing: [`${INGEST_SCHEDULE_PREFIX}11291`],
     });
     m.deps.now = () => now;
     // The list-call returns a stale schedule whose session_key (11291) IS

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   endpointUrl,
+  ingestSession,
   POLL_WINDOW_MS,
   type PollerDeps,
   type PollerEvent,
@@ -424,5 +425,81 @@ describe("pollSession — one minute of 5s ticks (scheduler can't fire sub-minut
     const lastTickWithinWindow = m.clock() <= Date.parse("2026-05-24T20:30:00.000Z") + 27_000;
     expect(lastTickWithinWindow).toBe(true);
     expect(summaries.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("ingestSession — Phase 9 post-session pass", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("fetches every endpoint once, weather included, regardless of the clock", async () => {
+    // :17 is deliberately NOT a weather tick for the legacy loop.
+    const m = makeMocks({
+      now: new Date("2026-05-24T20:30:17.000Z"),
+      respondTo: (url) => {
+        if (url.includes("/position")) return { status: 200, body: [positionRow] };
+        if (url.includes("/intervals")) return { status: 200, body: [intervalRow] };
+        if (url.includes("/laps")) return { status: 200, body: [lapRow] };
+        if (url.includes("/stints")) return { status: 200, body: [stintRow] };
+        return { status: 200, body: [weatherRow] };
+      },
+    });
+    const summary = await ingestSession(evt, m.deps);
+
+    expect(summary.attempted).toBe(5);
+    expect(summary.succeeded).toBe(5);
+    expect(summary.endpoints.weather).toBe("ok");
+    expect(summary.still_live).toBe(false);
+    expect(m.fetch).toHaveBeenCalledTimes(5);
+  });
+
+  it("flags still_live on 401 — the session has not gone free yet", async () => {
+    // This is the exact production signature: every endpoint 401s while OpenF1
+    // still classifies the session as live (paid tier).
+    const m = makeMocks({ respondTo: () => ({ status: 401 }) });
+    const summary = await ingestSession(evt, m.deps);
+
+    expect(summary.still_live).toBe(true);
+    expect(summary.unauthorized).toBe(5);
+    expect(summary.succeeded).toBe(0);
+    expect(m.emitMetric).toHaveBeenCalledWith("IngestStillLive", 1, {
+      session: String(SESSION_KEY),
+    });
+    expect(m.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("does not flag still_live for other HTTP failures", async () => {
+    const m = makeMocks({ respondTo: () => ({ status: 503 }) });
+    const summary = await ingestSession(evt, m.deps);
+
+    expect(summary.still_live).toBe(false);
+    expect(summary.unauthorized).toBe(0);
+    expect(summary.http_failures).toBe(5);
+    expect(m.emitMetric).not.toHaveBeenCalledWith("IngestStillLive", 1, expect.anything());
+  });
+
+  it("publishes one SQS message per successful endpoint", async () => {
+    const m = makeMocks({
+      respondTo: (url) =>
+        url.includes("/position")
+          ? { status: 200, body: [positionRow] }
+          : { status: 200, body: [] },
+    });
+    await ingestSession(evt, m.deps);
+
+    expect(m.sendMessage).toHaveBeenCalledTimes(5);
+    const first = JSON.parse(m.sendMessage.mock.calls[0]![0] as string) as PipelineEvent;
+    expect(first.schema_version).toBe(PIPELINE_EVENT_SCHEMA_VERSION);
+    expect(first.session_id).toBe(String(SESSION_KEY));
+  });
+
+  it("still_live survives a partial failure (some endpoints already free)", async () => {
+    const m = makeMocks({
+      respondTo: (url) => (url.includes("/laps") ? { status: 401 } : { status: 200, body: [] }),
+    });
+    const summary = await ingestSession(evt, m.deps);
+
+    expect(summary.still_live).toBe(true);
+    expect(summary.unauthorized).toBe(1);
+    expect(summary.succeeded).toBe(4);
   });
 });

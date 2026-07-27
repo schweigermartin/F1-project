@@ -6,7 +6,7 @@ import * as sns from "aws-cdk-lib/aws-sns";
 import { type Construct } from "constructs";
 import { describe, expect, it } from "vitest";
 
-import { InferenceStack } from "../lib/inference-stack.js";
+import { INFERENCE_FN_NAME, InferenceStack } from "../lib/inference-stack.js";
 
 class TestDepsStack extends Stack {
   readonly bucket: s3.Bucket;
@@ -140,6 +140,37 @@ describe("InferenceStack — trigger pathway", () => {
         ]),
       },
     });
+  });
+
+  // Regression: the role's InvokeFunction resource was built with formatArn's
+  // default SLASH_RESOURCE_NAME, yielding `function/F1-Inference`. Lambda ARNs
+  // use a colon, so the grant never matched and every scheduled prediction from
+  // round 8 (2026-06-28) onward died with AccessDeniedException in the DLQ.
+  // The pre-existing tests asserted the role's name/trust/DLQ but never the
+  // resource ARN, so CI stayed green throughout.
+  it("grants lambda:InvokeFunction on the COLON-form function ARN", () => {
+    synth().hasResourceProperties("AWS::IAM::Role", {
+      RoleName: "F1-Scheduler-InvokeInference",
+      Policies: Match.arrayWith([
+        Match.objectLike({
+          PolicyDocument: {
+            Statement: Match.arrayWith([
+              Match.objectLike({
+                Action: "lambda:InvokeFunction",
+                Resource: {
+                  "Fn::Join": ["", Match.arrayWith([`:function:${INFERENCE_FN_NAME}`])],
+                },
+              }),
+            ]),
+          },
+        }),
+      ]),
+    });
+  });
+
+  it("never grants InvokeFunction on a slash-form function ARN", () => {
+    const json = JSON.stringify(synth().toJSON());
+    expect(json).not.toContain(`:function/${INFERENCE_FN_NAME}`);
   });
 });
 

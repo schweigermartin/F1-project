@@ -236,3 +236,69 @@ describe("consumeBatch — DDB/S3 throws", () => {
     });
   });
 });
+
+describe("consumeBatch — duplicate keys within one batch", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // Regression: BatchWriteItem rejects the entire request when two items share
+  // a key ("Provided list of item keys contains duplicates"). The poller's
+  // retry/backoff re-sends overlapping windows, so this happened in production
+  // and parked 18 messages (session 11338) in F1-Events-DLQ on 2026-07-25.
+  it("collapses same-key rows so putItems never sees a duplicate PK+SK", async () => {
+    const m = makeMocks();
+    const event = {
+      Records: [
+        msg("m1", makeEvent("laps", [lapRow(63, 5)])),
+        msg("m2", makeEvent("laps", [lapRow(63, 5)])),
+      ],
+    };
+    const res = await consumeBatch(event, m.deps);
+
+    expect(res.batchItemFailures).toEqual([]);
+    const items = m.putItems.mock.calls[0]![0] as Array<Record<string, unknown>>;
+    const keys = items.map((i) => `${String(i["PK"])} ${String(i["SK"])}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(items).toHaveLength(1);
+    expect(m.emitMetric).toHaveBeenCalledWith("ConsumerDuplicateRows", 1);
+  });
+
+  it("keeps the later row when the same key repeats (last write wins)", async () => {
+    const m = makeMocks();
+    const stale = { ...lapRow(63, 5), lap_duration: 99.999 };
+    const fresh = { ...lapRow(63, 5), lap_duration: 87.123 };
+    const event = {
+      Records: [msg("m1", makeEvent("laps", [stale])), msg("m2", makeEvent("laps", [fresh]))],
+    };
+    await consumeBatch(event, m.deps);
+
+    const items = m.putItems.mock.calls[0]![0] as Array<Record<string, unknown>>;
+    expect(items).toHaveLength(1);
+    expect(items[0]!["lap_duration"]).toBe(87.123);
+  });
+
+  it("still archives every raw message to S3, duplicates included", async () => {
+    const m = makeMocks();
+    const event = {
+      Records: [
+        msg("m1", makeEvent("laps", [lapRow(63, 5)])),
+        msg("m2", makeEvent("laps", [lapRow(63, 5)])),
+      ],
+    };
+    const res = await consumeBatch(event, m.deps);
+
+    // S3 is the durable audit trail — it must not lose the second read.
+    expect(res.archived).toBe(2);
+    const body = m.putObject.mock.calls[0]![1] as string;
+    expect(body.trimEnd().split("\n")).toHaveLength(2);
+  });
+
+  it("does not emit the duplicate metric when all keys are distinct", async () => {
+    const m = makeMocks();
+    const event = {
+      Records: [msg("m1", makeEvent("laps", [lapRow(63, 5), lapRow(1, 5)]))],
+    };
+    await consumeBatch(event, m.deps);
+
+    expect(m.emitMetric).not.toHaveBeenCalledWith("ConsumerDuplicateRows", expect.anything());
+  });
+});

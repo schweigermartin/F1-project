@@ -28,10 +28,9 @@ test("renders the weekend hub panels and the podium flow", async ({ page }) => {
   const sorted = [...percentages].sort((a, b) => b - a);
   expect(percentages).toEqual(sorted);
 
-  // AC-5: clicking the top card expands its SHAP + Bedrock explanation.
+  // AC-9: the top-1 card's SHAP + Bedrock explanation is expanded by default,
+  // no click needed.
   const top = probs.first().locator("xpath=ancestor::button");
-  await expect(top).toHaveAttribute("aria-expanded", "false");
-  await top.click();
   await expect(top).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByText(/Souveräne Pole-Position/)).toBeVisible();
 });

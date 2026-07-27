@@ -3,7 +3,7 @@ import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import { type Construct } from "constructs";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { PipelineStack } from "../lib/pipeline-stack.js";
 
@@ -87,8 +87,15 @@ describe("PipelineStack — F1LiveTable", () => {
 });
 
 describe("PipelineStack — SQS EventsQueue + DLQ", () => {
-  it("creates exactly two SQS queues (main + DLQ)", () => {
-    synth().resourceCountIs("AWS::SQS::Queue", 2);
+  it("creates exactly three SQS queues (main + DLQ + ingest-scheduler DLQ)", () => {
+    synth().resourceCountIs("AWS::SQS::Queue", 3);
+  });
+
+  it("has an ingest-scheduler DLQ with 14 day retention (Phase 9)", () => {
+    synth().hasResourceProperties("AWS::SQS::Queue", {
+      QueueName: "F1-Ingest-Scheduler-DLQ",
+      MessageRetentionPeriod: 14 * 24 * 60 * 60,
+    });
   });
 
   it("DLQ is named F1-Events-DLQ with 7 day retention", () => {
@@ -116,10 +123,10 @@ describe("PipelineStack — SQS EventsQueue + DLQ", () => {
     });
   });
 
-  it("both queues deny non-TLS traffic via bucket-policy-style rule", () => {
+  it("every queue denies non-TLS traffic via bucket-policy-style rule", () => {
     const t = synth();
     // enforceSSL adds an AWS::SQS::QueuePolicy with a Deny on aws:SecureTransport=false.
-    t.resourceCountIs("AWS::SQS::QueuePolicy", 2);
+    t.resourceCountIs("AWS::SQS::QueuePolicy", 3);
     t.hasResourceProperties("AWS::SQS::QueuePolicy", {
       PolicyDocument: Match.objectLike({
         Statement: Match.arrayWith([
@@ -129,6 +136,48 @@ describe("PipelineStack — SQS EventsQueue + DLQ", () => {
           }),
         ]),
       }),
+    });
+  });
+});
+
+describe("PipelineStack — Phase 9 post-session ingest", () => {
+  it("alarms when an ingest delivery lands in the scheduler DLQ", () => {
+    synth().hasResourceProperties("AWS::CloudWatch::Alarm", {
+      AlarmName: "F1-Ingest-SchedulerDLQ",
+      MetricName: "ApproximateNumberOfMessagesVisible",
+      Namespace: "AWS/SQS",
+      ComparisonOperator: "GreaterThanThreshold",
+      Threshold: 0,
+      AlarmActions: Match.anyValue(),
+    });
+  });
+
+  it("passes the ingest DLQ ARN to schedule-sync so it can attach it to each schedule", () => {
+    synth().hasResourceProperties("AWS::Lambda::Function", {
+      FunctionName: "F1-ScheduleSync",
+      Environment: {
+        Variables: Match.objectLike({ INGEST_SCHEDULER_DLQ_ARN: Match.anyValue() }),
+      },
+    });
+  });
+
+  it("lets the scheduler role write to the ingest DLQ", () => {
+    const json = JSON.stringify(synth().toJSON());
+    expect(json).toContain("F1-Ingest-Scheduler-DLQ");
+  });
+
+  // Regression companion to the inference-stack ARN bug: assert the VALUE of
+  // the grant, not just that a role exists. The poller grant comes straight
+  // from the construct, so it must be the colon form.
+  it("grants the scheduler InvokeFunction on the colon-form poller ARN", () => {
+    const json = JSON.stringify(synth().toJSON());
+    expect(json).not.toContain(":function/F1-Poller");
+  });
+
+  it("gives the ingest lambda room for a full-session payload", () => {
+    synth().hasResourceProperties("AWS::Lambda::Function", {
+      FunctionName: "F1-Poller",
+      Timeout: 180,
     });
   });
 });

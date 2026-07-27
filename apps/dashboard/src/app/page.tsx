@@ -9,6 +9,7 @@ import explorer from "../components/explorer/explorer.module.css";
 import { ExplorerBar } from "../components/explorer/ExplorerBar";
 import { type PodiumEntry, PodiumStrip } from "../components/explorer/PodiumStrip";
 import { ResultBoard } from "../components/explorer/ResultBoard";
+import { RaceProgressionPanel } from "../components/progression/RaceProgressionPanel";
 import seasonStyles from "../components/season/season.module.css";
 import {
   Card,
@@ -29,6 +30,8 @@ import {
 } from "../lib/f1-api";
 import { PHOTOS, unsplash } from "../lib/images";
 import { type FastLapRow, getMeetingSessions, getPracticeFastestLaps } from "../lib/openf1";
+import type { PitStopRecord } from "../lib/race-analysis";
+import { getLapChart, getPitStops, type LapChart } from "../lib/race-progression";
 
 export const metadata: Metadata = {
   title: "F1 Season Explorer — 2026",
@@ -94,6 +97,22 @@ export default async function HomePage({
     practice = match ? await getPracticeFastestLaps(match.session_key).catch(() => null) : null;
   }
 
+  // Race analysis (Phase 9, AC-5/AC-6). Only for the race view, and only once
+  // the race has been run — a future round would cost two requests to learn
+  // what the calendar already tells us.
+  const showProgression =
+    sel.session === "race" && sel.race !== null && sel.race.date <= now.toISOString().slice(0, 10);
+  let lapChart: LapChart | null = null;
+  let pitStops: PitStopRecord[] | null = null;
+  if (showProgression) {
+    const [chartR, stopsR] = await Promise.allSettled([
+      getLapChart(season, sel.round),
+      getPitStops(season, sel.round),
+    ]);
+    lapChart = settled(chartR, null);
+    pitStops = settled(stopsR, null);
+  }
+
   const podium = buildPodium(sel.session, raceRows, quali, practice);
   const focus = sel.driver ? buildDriverFocus(sel.driver, drivers, raceRows) : null;
 
@@ -152,6 +171,16 @@ export default async function HomePage({
           focusDriver={sel.driver}
         />
       </Card>
+
+      {showProgression ? (
+        <RaceProgressionPanel
+          chart={lapChart}
+          pitStops={pitStops}
+          results={raceRows}
+          focusCode={sel.driver}
+          raceName={sel.race?.name ?? "dieses Rennen"}
+        />
+      ) : null}
 
       <div className={seasonStyles.grid} style={{ marginTop: "1.25rem" }}>
         <DriverStandingsCard rows={drivers} focusDriver={sel.driver} />

@@ -27,7 +27,16 @@ export function PodiumBoard({
   raceDate,
   standings,
 }: PodiumBoardProps): ReactNode {
-  const [expanded, setExpanded] = useState<number | null>(null);
+  // T13/AC-9: the top-1 driver's explanation starts open — the model's
+  // headline claim shouldn't be hidden behind a click. Lazy initializer so it
+  // only runs once per mount; `page.tsx` keys this component on the round so
+  // switching races remounts it and re-derives the new top-1 (rather than
+  // carrying over a stale `expanded` driver number across navigations).
+  const [expanded, setExpanded] = useState<number | null>(() =>
+    response && response.drivers.length > 0
+      ? (sortByPodium(response.drivers)[0]?.driver_number ?? null)
+      : null,
+  );
 
   if (!response || response.drivers.length === 0) {
     return (

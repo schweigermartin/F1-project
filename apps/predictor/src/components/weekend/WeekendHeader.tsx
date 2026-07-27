@@ -6,6 +6,7 @@ import type { ScheduledRace } from "../../lib/schedule";
 import { Flag } from "../Flag";
 import styles from "../hub.module.css";
 import { Countdown } from "./Countdown";
+import { RoundSelector } from "./RoundSelector";
 
 const MONTHS_DE = [
   "Jan.",
@@ -40,9 +41,11 @@ export interface WeekendHeaderProps {
   race: ScheduledRace;
   /** Next/live session to count down to (null off-weekend → countdown to race). */
   nextSession: Session | null;
+  /** Full season schedule, for the round selector (T10/AC-4). Empty hides it. */
+  schedule: ScheduledRace[];
 }
 
-export function WeekendHeader({ race, nextSession }: WeekendHeaderProps): ReactNode {
+export function WeekendHeader({ race, nextSession, schedule }: WeekendHeaderProps): ReactNode {
   const where = [race.locality, race.country].filter(Boolean).join(", ");
   // Count down to the next session if known, else to the race start time.
   const target = nextSession?.date_start ?? race.startsAt ?? null;
@@ -62,7 +65,10 @@ export function WeekendHeader({ race, nextSession }: WeekendHeaderProps): ReactN
           {[race.circuit, where, fmtDate(race.date)].filter(Boolean).join(" · ")}
         </div>
       </div>
-      {target ? <Countdown targetIso={target} label={targetLabel} /> : null}
+      <div className={styles.headerRight}>
+        <RoundSelector races={schedule} round={race.round} />
+        {target ? <Countdown targetIso={target} label={targetLabel} /> : null}
+      </div>
     </section>
   );
 }

@@ -96,3 +96,36 @@ export function pickTargetRace(races: ScheduledRace[], now: Date): ScheduledRace
     .sort((a, b) => a.date.localeCompare(b.date));
   return upcoming[0] ?? races[races.length - 1] ?? null;
 }
+
+/**
+ * Resolve `?round=N` against the season schedule (T9/AC-4): a valid,
+ * in-schedule round pins that race; anything missing, non-numeric or unknown
+ * falls back to `pickTargetRace` (next-or-last). Mirrors the dashboard
+ * explorer's `resolveSelection` (apps/dashboard/src/lib/explorer.ts) so a
+ * hand-edited or stale `?round=` link never crashes the page — it just
+ * degrades to the default race (AC-11). Pure.
+ */
+export function resolveRound(
+  roundParam: string | undefined,
+  races: ScheduledRace[],
+  now: Date,
+): ScheduledRace | null {
+  const requested = roundParam ? Number(roundParam) : NaN;
+  const requestedRace = Number.isInteger(requested)
+    ? races.find((r) => r.round === requested)
+    : undefined;
+  return requestedRace ?? pickTargetRace(races, now);
+}
+
+/**
+ * Whether the race on `dateISO` has already been run, as of `now` (T11/AC-4) —
+ * gates the "fetch the real Jolpica result" call so it's only made for races
+ * that can possibly have one. Same UTC-date, day-level granularity as
+ * `pickTargetRace`: a race is "happened" once its date is strictly before
+ * today (a same-day race is treated as not-yet-happened, consistent with how
+ * `pickTargetRace` still counts it as the target race). Pure.
+ */
+export function raceHasHappened(dateISO: string, now: Date): boolean {
+  const today = now.toISOString().slice(0, 10);
+  return dateISO < today;
+}

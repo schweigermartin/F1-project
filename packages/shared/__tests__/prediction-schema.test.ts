@@ -107,6 +107,46 @@ describe("PredictionApiResponseSchema", () => {
     expect(PredictionApiResponseSchema.parse(response)).toEqual(response);
   });
 
+  it("parses a response carrying normalized probabilities (Phase 010)", () => {
+    const response = {
+      schema_version: PREDICTION_API_SCHEMA_VERSION,
+      race_date: "2026-06-07",
+      round: 9,
+      model_version: "0.2.0",
+      drivers: [
+        { ...validPrediction, explanation: null, podium_probability_normalized: 0.42 },
+      ],
+    };
+    const parsed = PredictionApiResponseSchema.parse(response);
+    expect(parsed.drivers[0]?.podium_probability_normalized).toBe(0.42);
+    // The raw model output survives untouched alongside it (AC-4).
+    expect(parsed.drivers[0]?.podium_probability).toBe(0.68);
+  });
+
+  it("still parses a response without them, so deploy order is free (AC-5)", () => {
+    const response = {
+      schema_version: PREDICTION_API_SCHEMA_VERSION,
+      race_date: "2026-06-07",
+      round: 9,
+      model_version: "0.2.0",
+      drivers: [{ ...validPrediction, explanation: null }],
+    };
+    const parsed = PredictionApiResponseSchema.parse(response);
+    expect(parsed.drivers[0]?.podium_probability_normalized).toBeUndefined();
+  });
+
+  it("rejects a normalized probability outside [0, 1]", () => {
+    expect(() =>
+      PredictionApiResponseSchema.parse({
+        schema_version: PREDICTION_API_SCHEMA_VERSION,
+        race_date: "2026-06-07",
+        round: 9,
+        model_version: "0.2.0",
+        drivers: [{ ...validPrediction, explanation: null, podium_probability_normalized: 1.4 }],
+      }),
+    ).toThrow();
+  });
+
   it("rejects a stale schema_version (partial-deploy guard)", () => {
     expect(() =>
       PredictionApiResponseSchema.parse({

@@ -65,6 +65,60 @@ describe("getRacePredictions", () => {
     expect(ver.explanation?.bedrock_text).toContain("Fahrer 1");
   });
 
+  describe("podium probability normalization (Phase 010)", () => {
+    /** An over-allocated field like the ones measured live: sums to ~5.3. */
+    const OVER_ALLOCATED: [number, string, number][] = [
+      [1, "VER", 0.93],
+      [12, "ANT", 0.9],
+      [4, "NOR", 0.79],
+      [16, "LEC", 0.62],
+      [63, "RUS", 0.55],
+      [81, "PIA", 0.41],
+      [44, "HAM", 0.28],
+      [14, "ALO", 0.21],
+      [10, "GAS", 0.16],
+      [55, "SAI", 0.12],
+      [23, "ALB", 0.09],
+      [22, "TSU", 0.07],
+    ];
+
+    it("makes the served probabilities sum to three (AC-1)", async () => {
+      const { deps } = makeDeps(OVER_ALLOCATED.map(([n, c, p]) => predictionRow(n, c, p)));
+      const res = await getRacePredictions({ race_date: RACE_DATE, round: "7" }, deps);
+
+      const rawSum = res.drivers.reduce((a, d) => a + d.podium_probability, 0);
+      expect(rawSum).toBeGreaterThan(4.9);
+
+      const normSum = res.drivers.reduce(
+        (a, d) => a + (d.podium_probability_normalized ?? 0),
+        0,
+      );
+      expect(normSum).toBeCloseTo(3, 2);
+    });
+
+    it("leaves the stored model output untouched (AC-4)", async () => {
+      const { deps } = makeDeps(OVER_ALLOCATED.map(([n, c, p]) => predictionRow(n, c, p)));
+      const res = await getRacePredictions({ race_date: RACE_DATE, round: "7" }, deps);
+
+      const ver = res.drivers.find((d) => d.driver_number === 1)!;
+      expect(ver.podium_probability).toBe(0.93);
+      expect(ver.podium_probability_normalized).toBeLessThan(0.93);
+    });
+
+    it("keeps the normalized values aligned with their own driver", async () => {
+      const { deps } = makeDeps(OVER_ALLOCATED.map(([n, c, p]) => predictionRow(n, c, p)));
+      const res = await getRacePredictions({ race_date: RACE_DATE, round: "7" }, deps);
+
+      // Ranking by raw and by normalized probability must be identical (AC-2) —
+      // this is what catches an off-by-one between the two arrays.
+      const byRaw = [...res.drivers].sort((a, b) => b.podium_probability - a.podium_probability);
+      const byNorm = [...res.drivers].sort(
+        (a, b) => (b.podium_probability_normalized ?? 0) - (a.podium_probability_normalized ?? 0),
+      );
+      expect(byNorm.map((d) => d.driver_number)).toEqual(byRaw.map((d) => d.driver_number));
+    });
+  });
+
   it("leaves explanation null when Bedrock hasn't produced one yet", async () => {
     const { deps } = makeDeps([predictionRow(44, "HAM", 0.4)]);
     const res = await getRacePredictions({ race_date: RACE_DATE, round: "7" }, deps);

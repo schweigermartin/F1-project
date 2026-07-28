@@ -30,3 +30,31 @@ export function diffPredictionVsActual(
 export function hitCount(rows: ReadonlyArray<DiffRow>): number {
   return rows.filter((r) => r.hit).length;
 }
+
+/** Minimal shape of a starting-grid row — structural so this module stays
+ * independent of `quali-api` (which owns the fetching). */
+export interface GridPosition {
+  code: string;
+  grid: number;
+}
+
+/**
+ * The three drivers who started at the front — the trivial "podium = grid ≤ 3"
+ * baseline (Phase 010, AC-7). It is the same baseline the training notebook
+ * scores the model against (`ml/src/f1pred/evaluate.py:59`), which is the point:
+ * the comparison shown to a visitor is the one the model card already uses.
+ *
+ * Deliberately *not* a second comparison implementation — the resulting codes
+ * go through `diffPredictionVsActual`/`hitCount` exactly like the model's
+ * prediction does (Constitution III).
+ *
+ * Rows without a usable grid position are ignored; ties keep input order.
+ */
+export function gridTop3Codes(grid: ReadonlyArray<GridPosition> | null): string[] {
+  if (!grid) return [];
+  return [...grid]
+    .filter((s) => Number.isFinite(s.grid) && s.grid > 0)
+    .sort((a, b) => a.grid - b.grid)
+    .slice(0, 3)
+    .map((s) => s.code);
+}

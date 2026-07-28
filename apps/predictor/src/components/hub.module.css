@@ -424,6 +424,47 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Model vs. grid baseline (Phase 010) ───────────────────────────────── */
+.baselineGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.baselineRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "label hits" "codes hits";
+  align-items: center;
+  gap: 0 var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border);
+}
+.baselineRow:last-child {
+  border-bottom: none;
+}
+.baselineLabel {
+  grid-area: label;
+  font-size: 0.9rem;
+}
+.baselineCodes {
+  grid-area: codes;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+}
+.baselineHits {
+  grid-area: hits;
+  font-size: 1.05rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.baselineNote {
+  margin-top: var(--space-md);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
 /* ── Track history ─────────────────────────────────────────────────────── */
 .histList {
   display: flex;

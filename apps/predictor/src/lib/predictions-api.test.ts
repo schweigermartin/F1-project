@@ -26,4 +26,23 @@ describe("sortByPodium", () => {
     sortByPodium(input);
     expect(input.map((d) => d.driver_number)).toEqual([1, 16]);
   });
+
+  it("sorts on the normalized probability when the API supplied one", () => {
+    // Raw and normalized disagree here on purpose: only a sort that reads the
+    // normalized value produces 44 → 16 → 1.
+    const sorted = sortByPodium([
+      { ...driver(1, 0.9), podium_probability_normalized: 0.1 },
+      { ...driver(16, 0.5), podium_probability_normalized: 0.4 },
+      { ...driver(44, 0.2), podium_probability_normalized: 0.7 },
+    ]);
+    expect(sorted.map((d) => d.driver_number)).toEqual([44, 16, 1]);
+  });
+
+  it("falls back to the raw probability for a response without the field (AC-5)", () => {
+    const sorted = sortByPodium([
+      { ...driver(1, 0.9), podium_probability_normalized: 0.1 },
+      driver(16, 0.5), // no normalized value → raw 0.5 wins over 0.1
+    ]);
+    expect(sorted.map((d) => d.driver_number)).toEqual([16, 1]);
+  });
 });

@@ -1,6 +1,10 @@
 "use client";
 
-import { driverTeamColor, type PredictionApiResponse } from "@f1/shared";
+import {
+  driverTeamColor,
+  effectivePodiumProbability,
+  type PredictionApiResponse,
+} from "@f1/shared";
 import { type ReactNode, useState } from "react";
 
 import { sortByPodium } from "../../lib/predictions-api";
@@ -64,6 +68,9 @@ export function PodiumBoard({
         {drivers.map((d, i) => {
           const isOpen = expanded === d.driver_number;
           const team = driverTeamColor(d.driver_code, standings);
+          // Phase 010: the normalized probability when the API served one, the
+          // raw model output otherwise — one number for bar, label and order.
+          const probability = effectivePodiumProbability(d);
           return (
             <div key={d.driver_number} className={styles.driver}>
               <button
@@ -76,7 +83,7 @@ export function PodiumBoard({
                 <span
                   className={styles.driverFill}
                   style={{
-                    width: `${Math.round(d.podium_probability * 100)}%`,
+                    width: `${Math.round(probability * 100)}%`,
                     background: `linear-gradient(90deg, ${team.primary}, ${team.accent})`,
                   }}
                   aria-hidden
@@ -96,7 +103,7 @@ export function PodiumBoard({
                   <span />
                 )}
                 <span className={`${styles.prob} tnum`} data-testid="podium-prob">
-                  {pct(d.podium_probability)}
+                  {pct(probability)}
                 </span>
               </button>
 

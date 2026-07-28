@@ -5,6 +5,7 @@ export * from "./design-tokens.js";
 export * from "./evaluation-schema.js";
 export * from "./event-schema.js";
 export * from "./jolpica-schema.js";
+export * from "./model-provenance.js";
 export * from "./openf1-schema.js";
 export * from "./podium-normalize.js";
 export * from "./prediction-schema.js";

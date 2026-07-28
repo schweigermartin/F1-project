@@ -3,6 +3,7 @@
 import {
   driverTeamColor,
   effectivePodiumProbability,
+  modelProvenance,
   type PredictionApiResponse,
 } from "@f1/shared";
 import { type ReactNode, useState } from "react";
@@ -57,6 +58,9 @@ export function PodiumBoard({
   }
 
   const drivers = sortByPodium(response.drivers);
+  const provenance = modelProvenance(response.model_version);
+  // Only claim normalization when the API actually supplied it (AC-5 fallback).
+  const isNormalized = drivers.some((d) => d.podium_probability_normalized !== undefined);
 
   return (
     <section className={`card ${styles.col8}`}>
@@ -120,6 +124,24 @@ export function PodiumBoard({
             </div>
           );
         })}
+      </div>
+
+      {/* AC-6: what the number means and what the model has seen, without a click. */}
+      <div className={styles.provenance}>
+        {isNormalized ? (
+          <p>
+            Die Prozentwerte sind auf die drei Podiumsplätze normiert — sie summieren sich über
+            alle Fahrer zu 300 %.
+          </p>
+        ) : null}
+        {provenance ? (
+          <p>
+            Trainiert auf den Saisons {provenance.trainedSeasons}. Die Formkurven-Merkmale
+            (Fahrer- und Teamform, Streckenhistorie) stammen aus Daten bis einschließlich{" "}
+            {provenance.historyThrough} und werden im Saisonverlauf nicht fortgeschrieben — für
+            die Regeländerungen 2026 ist das eine bekannte Schwäche.
+          </p>
+        ) : null}
       </div>
     </section>
   );

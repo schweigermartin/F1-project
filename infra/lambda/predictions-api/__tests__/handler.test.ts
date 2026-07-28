@@ -89,10 +89,7 @@ describe("getRacePredictions", () => {
       const rawSum = res.drivers.reduce((a, d) => a + d.podium_probability, 0);
       expect(rawSum).toBeGreaterThan(4.9);
 
-      const normSum = res.drivers.reduce(
-        (a, d) => a + (d.podium_probability_normalized ?? 0),
-        0,
-      );
+      const normSum = res.drivers.reduce((a, d) => a + (d.podium_probability_normalized ?? 0), 0);
       expect(normSum).toBeCloseTo(3, 2);
     });
 

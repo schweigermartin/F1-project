@@ -62,6 +62,25 @@ Binary XGBoost classifier: probability a driver finishes on the podium (P≤3).
 {_metric_row("XGBoost", meta.metrics)}
 {_metric_row("baseline", meta.baseline)}
 
+## What the probability means
+
+The model scores each driver as an independent binary problem, so the raw
+`predict_proba` outputs of one race do **not** sum to the three available podium
+slots — measured on the live Read-API over rounds 8–11 of 2026 they summed to
+4.94–5.83. `scale_pos_weight` (used against the ~15% class imbalance) adds to
+this by biasing the intercept upwards.
+
+The Read-API therefore applies a single additive shift `b` in log-odds space
+with `Σ σ(logit(pᵢ) + b) = 3` before serving a race (`@f1/shared/podium-normalize`).
+That is a **normalisation onto a known constraint, not a learned calibration**:
+it preserves the ranking exactly and fixes the total, but it is not fitted on a
+holdout fold, so it carries no claim about reliability at any individual
+probability level. Platt / isotonic / beta calibration needs a retrain and is
+not part of this artifact.
+
+The stored DynamoDB rows keep the raw model output; the normalisation happens
+on the read path only.
+
 ## Limitations
 
 {meta.limitations}

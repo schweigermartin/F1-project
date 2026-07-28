@@ -36,4 +36,4 @@
 - [ ] **T17** — README: Phasen-Tabelle + kurzer Abschnitt zur Bedeutung der Wahrscheinlichkeiten (Constitution XII).
 - [ ] **T18** — Gate: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`, `cdk synth` grün; ml: `ruff`, `mypy`, `pytest` grün (AC-11).
 - [ ] **T19** — Deploy `F1-Inference` (nur das Read-API-Lambda ändert sich) + Verifikation an einem gespeicherten Rennen: Σ der normierten Wahrscheinlichkeiten = 3,00.
-- [ ] **T20** *(manuell, nach Deploy)* — realer `refresh_history`-Lauf für 2026 R1–R11, Ergebnis im Spec-Status dokumentieren.
+- [ ] **T20** _(manuell, nach Deploy)_ — realer `refresh_history`-Lauf für 2026 R1–R11, Ergebnis im Spec-Status dokumentieren.

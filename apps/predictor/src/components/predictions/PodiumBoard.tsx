@@ -130,16 +130,16 @@ export function PodiumBoard({
       <div className={styles.provenance}>
         {isNormalized ? (
           <p>
-            Die Prozentwerte sind auf die drei Podiumsplätze normiert — sie summieren sich über
-            alle Fahrer zu 300 %.
+            Die Prozentwerte sind auf die drei Podiumsplätze normiert — sie summieren sich über alle
+            Fahrer zu 300 %.
           </p>
         ) : null}
         {provenance ? (
           <p>
-            Trainiert auf den Saisons {provenance.trainedSeasons}. Die Formkurven-Merkmale
-            (Fahrer- und Teamform, Streckenhistorie) stammen aus Daten bis einschließlich{" "}
-            {provenance.historyThrough} und werden im Saisonverlauf nicht fortgeschrieben — für
-            die Regeländerungen 2026 ist das eine bekannte Schwäche.
+            Trainiert auf den Saisons {provenance.trainedSeasons}. Die Formkurven-Merkmale (Fahrer-
+            und Teamform, Streckenhistorie) stammen aus Daten bis einschließlich{" "}
+            {provenance.historyThrough} und werden im Saisonverlauf nicht fortgeschrieben — für die
+            Regeländerungen 2026 ist das eine bekannte Schwäche.
           </p>
         ) : null}
       </div>

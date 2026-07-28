@@ -15,12 +15,12 @@ gibt drei Podiumsplätze, die Summe aller Fahrerwahrscheinlichkeiten eines
 Rennens muss also 3,00 sein. Gemessen über die Read-API
 (`?race_date=…&round=…`, alle 19 Fahrer summiert):
 
-| Runde | Σ P(Podium) | Fahrer > 50 % |
-| ----- | ----------- | ------------- |
-| 8 Österreich | **5,83** | 6 |
-| 9 Silverstone | **5,27** | 6 |
-| 10 Spa | **4,94** | 5 |
-| 11 Ungarn | **5,57** | 6 |
+| Runde         | Σ P(Podium) | Fahrer > 50 % |
+| ------------- | ----------- | ------------- |
+| 8 Österreich  | **5,83**    | 6             |
+| 9 Silverstone | **5,27**    | 6             |
+| 10 Spa        | **4,94**    | 5             |
+| 11 Ungarn     | **5,57**    | 6             |
 
 Das ist kein Ausreißer, sondern strukturell: `PredictionItemSchema`
 (`packages/shared/src/prediction-schema.ts:61-68`) bewertet jeden Fahrer als
@@ -55,13 +55,13 @@ die es nicht mehr gibt. Nichts in der UI legt das offen.
 **(3) Gegen die triviale Baseline steht es unentschieden.** Modell-Top-3 gegen
 tatsächliches Podium, vier Rennen (Read-API vs. Jolpica):
 
-| Runde | Modell | Realität | Treffer | Startaufstellung 1-2-3 | Treffer |
-| ----- | ------ | -------- | ------- | ---------------------- | ------- |
-| 8 | VER LEC NOR | RUS VER ANT | 1 | RUS ANT PIA | 2 |
-| 9 | LEC ANT RUS | LEC RUS HAM | 2 | ANT LEC HAD | 1 |
-| 10 | VER ANT NOR | ANT LEC VER | 2 | ANT VER NOR | 2 |
-| 11 | NOR ANT HAM | NOR VER ANT | 2 | NOR LEC VER | 2 |
-| | | | **7/12** | | **7/12** |
+| Runde | Modell      | Realität    | Treffer  | Startaufstellung 1-2-3 | Treffer  |
+| ----- | ----------- | ----------- | -------- | ---------------------- | -------- |
+| 8     | VER LEC NOR | RUS VER ANT | 1        | RUS ANT PIA            | 2        |
+| 9     | LEC ANT RUS | LEC RUS HAM | 2        | ANT LEC HAD            | 1        |
+| 10    | VER ANT NOR | ANT LEC VER | 2        | ANT VER NOR            | 2        |
+| 11    | NOR ANT HAM | NOR VER ANT | 2        | NOR LEC VER            | 2        |
+|       |             |             | **7/12** |                        | **7/12** |
 
 **Vorbehalt, der überall mitgeführt werden muss: n = 4 Rennen / 12 Slots. Das
 ist statistisch nicht signifikant** und beweist nicht, dass das Modell wertlos

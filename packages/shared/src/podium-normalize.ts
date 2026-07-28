@@ -89,8 +89,7 @@ export function normalizePodiumProbabilities(
   if (n <= slots) return probabilities.map(() => 1);
 
   const logits = probabilities.map(logit);
-  const sumAt = (shift: number): number =>
-    logits.reduce((acc, z) => acc + sigmoid(z + shift), 0);
+  const sumAt = (shift: number): number => logits.reduce((acc, z) => acc + sigmoid(z + shift), 0);
 
   let lo = SHIFT_LO;
   let hi = SHIFT_HI;

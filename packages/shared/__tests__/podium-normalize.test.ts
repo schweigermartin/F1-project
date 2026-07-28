@@ -31,8 +31,7 @@ describe("normalizePodiumProbabilities", () => {
     const raw = [0.4, 0.9, 0.1, 0.75, 0.6];
     const normalized = normalizePodiumProbabilities(raw);
 
-    const orderOf = (xs: number[]): number[] =>
-      xs.map((_, i) => i).sort((a, b) => xs[b]! - xs[a]!);
+    const orderOf = (xs: number[]): number[] => xs.map((_, i) => i).sort((a, b) => xs[b]! - xs[a]!);
     expect(orderOf(normalized)).toEqual(orderOf(raw));
   });
 

@@ -6,12 +6,12 @@
 
 Vier voneinander unabhängige Bausteine, in dieser Reihenfolge committbar:
 
-| Block | Was | Wo |
-| ----- | --- | -- |
-| **A** | Normalisierung auf drei Plätze | `@f1/shared` → Read-API → Frontend |
-| **B** | Grid-Baseline sichtbar | Frontend, ohne neue Fetches |
-| **C** | Trainingsfenster offenlegen | Frontend, statisch aus `model_version` |
-| **D** | History-Refresh für die laufende Saison | `ml/` (pure Funktion + CLI) |
+| Block | Was                                     | Wo                                     |
+| ----- | --------------------------------------- | -------------------------------------- |
+| **A** | Normalisierung auf drei Plätze          | `@f1/shared` → Read-API → Frontend     |
+| **B** | Grid-Baseline sichtbar                  | Frontend, ohne neue Fetches            |
+| **C** | Trainingsfenster offenlegen             | Frontend, statisch aus `model_version` |
+| **D** | History-Refresh für die laufende Saison | `ml/` (pure Funktion + CLI)            |
 
 A ist der Kern, B und C sind klein, D ist die Voraussetzung für das spätere
 Neu-Training.
@@ -48,7 +48,7 @@ Eigenschaften, die genau die Acceptance Criteria treffen:
   die Ordnung bleibt exakt erhalten.
 - **Wertebereich** (AC-3): σ bildet nach (0, 1) ab, per Konstruktion.
 
-Der eigentliche Grund, warum das die *richtige* Korrektur ist und nicht bloß
+Der eigentliche Grund, warum das die _richtige_ Korrektur ist und nicht bloß
 eine, die die Summe trifft: `train.py:57` setzt `scale_pos_weight = neg/pos`.
 Eine Gewichtung der positiven Klasse verschiebt in einem logistischen Modell
 genau den **Intercept** um ≈ `log(neg/pos)` — also einen konstanten Versatz auf
@@ -58,19 +58,19 @@ die Symptome zu glätten.
 
 **Was es nicht ist, und so wird es auch benannt:** keine gelernte Kalibrierung.
 Platt/Isotonic/Beta brauchen einen Holdout-Fold und damit das Neu-Training
-(Spec „Out of Scope"). Diese Normalisierung nutzt nur die *bekannte
-Nebenbedingung*, dass ein Rennen drei Podiumsplätze hat. In der UI heißt sie
+(Spec „Out of Scope"). Diese Normalisierung nutzt nur die _bekannte
+Nebenbedingung_, dass ein Rennen drei Podiumsplätze hat. In der UI heißt sie
 deshalb „auf drei Plätze normiert", nicht „kalibriert".
 
 ### 2.3 Randfälle
 
-| Fall | Verhalten | Begründung |
-| ---- | --------- | ---------- |
-| leeres Feld | `[]` | nichts zu normieren |
-| `n ≤ slots` | alle `1.0` | bei ≤ 3 Fahrern fahren alle aufs Podium; die Summe kann `slots` nicht erreichen, `1.0` ist die korrekte Sättigung |
-| `pᵢ ∈ {0, 1}` | auf `[ε, 1−ε]` geklemmt | `logit` wäre sonst ±∞ |
-| Summe bereits exakt `slots` | `b ≈ 0`, Werte praktisch unverändert | Fixpunkt |
-| alle `pᵢ` gleich | alle `slots/n` | symmetrisch korrekt |
+| Fall                        | Verhalten                            | Begründung                                                                                                        |
+| --------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| leeres Feld                 | `[]`                                 | nichts zu normieren                                                                                               |
+| `n ≤ slots`                 | alle `1.0`                           | bei ≤ 3 Fahrern fahren alle aufs Podium; die Summe kann `slots` nicht erreichen, `1.0` ist die korrekte Sättigung |
+| `pᵢ ∈ {0, 1}`               | auf `[ε, 1−ε]` geklemmt              | `logit` wäre sonst ±∞                                                                                             |
+| Summe bereits exakt `slots` | `b ≈ 0`, Werte praktisch unverändert | Fixpunkt                                                                                                          |
+| alle `pᵢ` gleich            | alle `slots/n`                       | symmetrisch korrekt                                                                                               |
 
 Bisektion über `b ∈ [−100, +100]`, Abbruch bei `|Σ − slots| < 1e-9` oder 200
 Iterationen (deterministisch, kein Solver-Import).
@@ -95,7 +95,7 @@ die API liefert „was das für dieses Rennen bedeutet".
 `PredictionWithExplanationSchema` bekommt ein **optionales** Feld:
 
 ```ts
-podium_probability_normalized: z.number().min(0).max(1).optional()
+podium_probability_normalized: z.number().min(0).max(1).optional();
 ```
 
 `PredictionItemSchema` (= die DDB-Zeile) bleibt unangetastet — das Feld existiert
@@ -104,22 +104,22 @@ nur auf der Leitung, nie im Speicher.
 `PREDICTION_API_SCHEMA_VERSION` bleibt bei `1`. Das ist Absicht und der Grund
 ist AC-5: Read-API (Lambda) und Frontend (Vercel) deployen getrennt. Ein
 `z.literal`-Bump würde in der Lücke dazwischen jede Antwort hart abweisen. Ein
-*additives, optionales* Feld ist in beide Richtungen verträglich — altes
+_additives, optionales_ Feld ist in beide Richtungen verträglich — altes
 Frontend ignoriert es (Zod strippt unbekannte Keys), neues Frontend fällt über
 den Helper auf `podium_probability` zurück. Der Versions-Literal bleibt dem
 vorbehalten, was er absichern soll: **brechende** Formänderungen.
 
 ### 2.6 Dateien
 
-| Datei | Änderung |
-| ----- | -------- |
-| `packages/shared/src/podium-normalize.ts` | **neu** — `normalizePodiumProbabilities`, `effectivePodiumProbability` |
-| `packages/shared/__tests__/podium-normalize.test.ts` | **neu** — AC-1/2/3 + alle Randfälle aus 2.3 |
-| `packages/shared/src/index.ts` | Re-Export |
-| `packages/shared/src/prediction-schema.ts` | optionales Feld + Doku warum ohne Version-Bump |
-| `infra/lambda/predictions-api/handler.ts` | Normalisierung vor `PredictionApiResponseSchema.parse` |
-| `apps/predictor/src/lib/predictions-api.ts` | `sortByPodium` sortiert über den Helper |
-| `apps/predictor/src/components/predictions/PodiumBoard.tsx` | zeigt den normierten Wert |
+| Datei                                                       | Änderung                                                               |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `packages/shared/src/podium-normalize.ts`                   | **neu** — `normalizePodiumProbabilities`, `effectivePodiumProbability` |
+| `packages/shared/__tests__/podium-normalize.test.ts`        | **neu** — AC-1/2/3 + alle Randfälle aus 2.3                            |
+| `packages/shared/src/index.ts`                              | Re-Export                                                              |
+| `packages/shared/src/prediction-schema.ts`                  | optionales Feld + Doku warum ohne Version-Bump                         |
+| `infra/lambda/predictions-api/handler.ts`                   | Normalisierung vor `PredictionApiResponseSchema.parse`                 |
+| `apps/predictor/src/lib/predictions-api.ts`                 | `sortByPodium` sortiert über den Helper                                |
+| `apps/predictor/src/components/predictions/PodiumBoard.tsx` | zeigt den normierten Wert                                              |
 
 ## 3. Block B — Grid-Baseline
 
@@ -144,7 +144,7 @@ keine zweite Vergleichsimplementierung) und wird dort mitgetestet.
 Statische, versionsgebundene Herkunftsangabe in `@f1/shared`:
 
 ```ts
-MODEL_PROVENANCE: Record<string, { trainedSeasons: string; historyThrough: string }>
+MODEL_PROVENANCE: Record<string, { trainedSeasons: string; historyThrough: string }>;
 ```
 
 `0.2.0 → { trainedSeasons: "2022–2025", historyThrough: "2025" }`, plus ein
@@ -171,7 +171,7 @@ def append_races(history: pd.DataFrame, new_races: pd.DataFrame) -> pd.DataFrame
 Die `.shift(1)`-Garantie (AC-10) wird nicht angefasst: `build_features` leitet
 die rollierenden Features aus der Reihenfolge des Frames ab, und die bleibt nach
 `(year, round)` sortiert. Der Test dazu ist explizit: History um ein Rennen
-verlängern und prüfen, dass die Features der *vorherigen* Rennen unverändert
+verlängern und prüfen, dass die Features der _vorherigen_ Rennen unverändert
 bleiben.
 
 ### 5.2 CLI
@@ -192,19 +192,19 @@ Funktion; der CLI-Lauf ist ein manueller Schritt mit dokumentiertem Ergebnis.
 
 ## 6. Tests (Constitution X)
 
-| Ebene | Was |
-| ----- | --- |
+| Ebene             | Was                                                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `packages/shared` | Normalisierung: Summe = slots, Rangerhaltung, Wertebereich, alle Randfälle aus 2.3, Idempotenz (zweimal normieren = einmal) |
-| `packages/shared` | Schema: Antwort mit und ohne das neue Feld parst |
-| `infra` | Read-API: Antwort trägt normierte Werte, Summe = 3, Rohwert unverändert |
-| `apps/predictor` | `top3Overlap` inkl. leerer/unvollständiger Eingaben |
-| `ml` | `append_races`: Dedupe, Idempotenz, Sortierung, Leakage-Invarianz (AC-10) |
+| `packages/shared` | Schema: Antwort mit und ohne das neue Feld parst                                                                            |
+| `infra`           | Read-API: Antwort trägt normierte Werte, Summe = 3, Rohwert unverändert                                                     |
+| `apps/predictor`  | `top3Overlap` inkl. leerer/unvollständiger Eingaben                                                                         |
+| `ml`              | `append_races`: Dedupe, Idempotenz, Sortierung, Leakage-Invarianz (AC-10)                                                   |
 
 ## 7. Risiken
 
-| Risiko | Umgang |
-| ------ | ------ |
-| Bisektion konvergiert nicht | festes Intervall + Iterationsdeckel; Test mit extremen Eingaben (alle 0, alle 1) |
-| Normierte Werte wirken „schlechter" (kein 94-%-Balken mehr) | genau das ist der Punkt — die UI benennt die Bedeutung explizit (AC-6) |
-| Frontend/Lambda-Deploy-Reihenfolge | optionales Feld + Fallback-Helper (AC-5), kein Versions-Bump |
-| FastF1-Rate-Limit beim Refresh | CLI läuft manuell, rundenweise, mit `--dry-run`; kein CI-Pfad |
+| Risiko                                                      | Umgang                                                                           |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Bisektion konvergiert nicht                                 | festes Intervall + Iterationsdeckel; Test mit extremen Eingaben (alle 0, alle 1) |
+| Normierte Werte wirken „schlechter" (kein 94-%-Balken mehr) | genau das ist der Punkt — die UI benennt die Bedeutung explizit (AC-6)           |
+| Frontend/Lambda-Deploy-Reihenfolge                          | optionales Feld + Fallback-Helper (AC-5), kein Versions-Bump                     |
+| FastF1-Rate-Limit beim Refresh                              | CLI läuft manuell, rundenweise, mit `--dry-run`; kein CI-Pfad                    |

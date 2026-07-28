@@ -113,9 +113,7 @@ describe("PredictionApiResponseSchema", () => {
       race_date: "2026-06-07",
       round: 9,
       model_version: "0.2.0",
-      drivers: [
-        { ...validPrediction, explanation: null, podium_probability_normalized: 0.42 },
-      ],
+      drivers: [{ ...validPrediction, explanation: null, podium_probability_normalized: 0.42 }],
     };
     const parsed = PredictionApiResponseSchema.parse(response);
     expect(parsed.drivers[0]?.podium_probability_normalized).toBe(0.42);

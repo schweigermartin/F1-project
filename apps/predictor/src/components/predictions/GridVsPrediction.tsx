@@ -1,4 +1,8 @@
-import { driverTeamColor, type PredictionApiResponse } from "@f1/shared";
+import {
+  driverTeamColor,
+  effectivePodiumProbability,
+  type PredictionApiResponse,
+} from "@f1/shared";
 import type { ReactNode } from "react";
 
 import { sortByPodium } from "../../lib/predictions-api";
@@ -35,7 +39,7 @@ export function GridVsPrediction({ response, grid, standings }: GridVsPrediction
             <div key={d.driver_number} className={styles.gvpRow}>
               <span className={`${styles.gvpGrid} tnum`}>{start ? `P${start}` : "—"}</span>
               <span style={{ color: team.primary, fontWeight: 700 }}>{d.driver_code}</span>
-              <span className="tnum">{Math.round(d.podium_probability * 100)} %</span>
+              <span className="tnum">{Math.round(effectivePodiumProbability(d) * 100)} %</span>
             </div>
           );
         })}

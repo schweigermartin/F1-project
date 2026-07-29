@@ -5,6 +5,7 @@ import { Flag } from "../components/Flag";
 import { TrackHistory } from "../components/history/TrackHistory";
 import hub from "../components/hub.module.css";
 import { LiveResultPanel } from "../components/live/LiveResultPanel";
+import { BaselineComparison } from "../components/predictions/BaselineComparison";
 import { GridVsPrediction } from "../components/predictions/GridVsPrediction";
 import { PodiumBoard } from "../components/predictions/PodiumBoard";
 import { SeasonPerformance } from "../components/SeasonPerformance";
@@ -110,6 +111,8 @@ export default async function PredictorPage({ searchParams }: PageProps): Promis
           finalTop3={finalTop3}
           liveSessionKey={liveSessionKey}
         />
+        {/* AC-8: purely derived from data already fetched above — no new request. */}
+        <BaselineComparison predictedTop3={predictedTop3} grid={grid} finalTop3={finalTop3} />
         <StandingsMini rows={standings} />
 
         <TrackHistory winners={winners} />

@@ -6,6 +6,7 @@
  */
 
 import {
+  effectivePodiumProbability,
   type PredictionApiResponse,
   PredictionApiResponseSchema,
   type PredictionWithExplanation,
@@ -39,7 +40,14 @@ export async function fetchRacePredictions(
   }
 }
 
-/** Podium order (US-1): highest probability first. Pure + stable copy. */
+/**
+ * Podium order (US-1): highest probability first. Pure + stable copy.
+ *
+ * Sorts on the *effective* probability — the Phase-010 normalized value when
+ * the API supplied one, the raw model output otherwise. Normalization is
+ * rank-preserving, so the resulting order is the same either way; going
+ * through the helper keeps display and ordering on one number.
+ */
 export function sortByPodium(drivers: PredictionWithExplanation[]): PredictionWithExplanation[] {
-  return [...drivers].sort((a, b) => b.podium_probability - a.podium_probability);
+  return [...drivers].sort((a, b) => effectivePodiumProbability(b) - effectivePodiumProbability(a));
 }

@@ -84,9 +84,25 @@ export type ExplanationItem = z.infer<typeof ExplanationItemSchema>;
 /**
  * Per-driver view the Read-API returns: the prediction plus its explanation,
  * which is `null` while Bedrock hasn't (yet) produced one.
+ *
+ * `podium_probability_normalized` (Phase 010) is the model probability rescaled
+ * so that a race's probabilities sum to the three podium slots — see
+ * `podium-normalize.ts` for why the raw per-driver output cannot. It exists
+ * **only on the wire**: the Read-API computes it while serializing, so the DDB
+ * row (`PredictionItemSchema`) keeps the untouched model output as an audit
+ * trail and the eleven already-stored races become correct without a backfill.
+ *
+ * It is deliberately **optional**, and `PREDICTION_API_SCHEMA_VERSION` stays at
+ * 1. The Read-API (Lambda) and the frontend (Vercel) deploy separately, so a
+ * frontend can legitimately meet a response that predates the field. Bumping
+ * the literal would make every response in that window fail hard; an additive
+ * optional field is compatible in both directions — an old frontend strips it,
+ * a new one falls back via `effectivePodiumProbability`. The version literal
+ * stays reserved for what it exists to catch: *breaking* shape changes.
  */
 export const PredictionWithExplanationSchema = PredictionItemSchema.extend({
   explanation: ExplanationItemSchema.nullable(),
+  podium_probability_normalized: z.number().min(0).max(1).optional(),
 });
 export type PredictionWithExplanation = z.infer<typeof PredictionWithExplanationSchema>;
 

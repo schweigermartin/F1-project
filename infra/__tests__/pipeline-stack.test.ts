@@ -17,13 +17,26 @@ class TestBucketStack extends Stack {
   }
 }
 
-function synth(): Template {
+function buildTemplate(): Template {
   const app = new App();
   const bucketStack = new TestBucketStack(app, "TestBucketStack");
   const stack = new PipelineStack(app, "TestPipeline", {
     dataBucket: bucketStack.bucket,
   });
   return Template.fromStack(stack);
+}
+
+/**
+ * Memoized: every call builds the identical stack (the function takes no
+ * arguments and CDK synth is deterministic), and `Template` is only ever read
+ * by assertions. Re-synthesizing per test cost 2.5-4s each — with 19 calls in
+ * this file that dominated CI runtime and pushed individual tests past vitest's
+ * 5s default timeout. Building it once keeps the assertions unchanged.
+ */
+let cachedTemplate: Template | undefined;
+function synth(): Template {
+  cachedTemplate ??= buildTemplate();
+  return cachedTemplate;
 }
 
 describe("PipelineStack — F1LiveTable", () => {

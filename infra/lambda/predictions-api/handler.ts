@@ -1,5 +1,6 @@
 import {
   ExplanationItemSchema,
+  normalizePodiumProbabilities,
   PREDICTION_API_SCHEMA_VERSION,
   type PredictionApiResponse,
   PredictionApiResponseSchema,
@@ -92,8 +93,17 @@ export async function getRacePredictions(
   }
 
   // Returned unsorted — the frontend sorts by probability (US-1).
-  const drivers = [...predictions.values()].map((p) => ({
+  const rows = [...predictions.values()];
+
+  // Phase 010: the model scores each driver independently, so a race's raw
+  // probabilities sum to ~5 instead of 3. Normalising here rather than at write
+  // time means every already-stored race is corrected without a backfill, and
+  // the DDB row keeps the untouched model output (spec AC-4).
+  const normalized = normalizePodiumProbabilities(rows.map((p) => p.podium_probability));
+
+  const drivers = rows.map((p, i) => ({
     ...p,
+    podium_probability_normalized: normalized[i]!,
     explanation: explanations.get(p.driver_number) ?? null,
   }));
 

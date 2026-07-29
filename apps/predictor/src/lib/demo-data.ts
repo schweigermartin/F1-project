@@ -30,6 +30,14 @@ export const DEMO_RACE: ScheduledRace = {
   lon: -73.5228,
 };
 
+/**
+ * Demo fixture — deliberately carries no `podium_probability_normalized`.
+ * It is a four-driver excerpt of a twenty-car field, and normalizing an
+ * excerpt onto three podium slots would push every driver towards 100%, which
+ * would misrepresent rather than illustrate. Without the field the UI falls
+ * back to the raw values via `effectivePodiumProbability` — which is also a
+ * live exercise of the AC-5 fallback path.
+ */
 export const DEMO_PREDICTIONS: PredictionApiResponse = {
   schema_version: 1,
   race_date: DEMO_RACE.date,

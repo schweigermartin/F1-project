@@ -168,6 +168,39 @@ Pro Phase erst `spec.md` schreiben/reviewen → dann `plan.md` ableiten → dann
 | 7   | [Race Weekend Hub](specs/007-race-weekend-hub/spec.md)                 | ✅ deployed | Predictor wird zum Rennwochenende-Cockpit: Session-Timeline + Countdown, interaktive Streckenkarte (animierte Runde), Wetter (Open-Meteo), Podium-Karten in Team-Farben + SHAP-Wasserfall, Grid-vs-Vorhersage, Strecken-Historie, Live-/Ergebnis-Panel (Vorhersage vs. Realität), interaktiver Saison-Chart; gemeinsame Design-Tokens + Team-Farben über alle Frontends. Nur freie APIs, **kein neues AWS** |
 | 8   | [Season Explorer](specs/008-season-explorer/spec.md)                   | ✅ deployed | Dashboard-Landing wird interaktiver Season Explorer: Selektoren für Rennen/Runde, Session (FP/Quali/Race) und Fahrer-Fokus (URL-basiert, teilbar), Podium + adaptives Ergebnis-Board (Jolpica Race/Quali, OpenF1 Practice-Bestzeiten), WM-Fokus-Highlight, klickbarer Kalender. Nur freie APIs, **kein neues AWS**                                                                                          |
 
+| 9 | [Year-Round Value](specs/009-year-round-value/spec.md) | ✅ deployed | Post-Session-Ingest (T+35min, ohne OpenF1-Live-Abo), Vorhersage-Archiv über die ganze Saison, Rennanalyse (Positionsverlauf, Boxenstopps, Stints) und Replay-Auswahl statt Session-ID-Eingabe |
+| 10 | [Kalibrierung + Aktualität](specs/010-calibration-and-freshness/spec.md) | 🚧 gebaut | Podiums-Wahrscheinlichkeiten auf drei Plätze normiert (Read-Pfad, wirkt rückwirkend), Grid-Baseline sichtbar neben dem Modell, Trainingsfenster offengelegt, `refresh_history`-CLI für saisonaktuelle Formkurven |
+
+## Was die Podiums-Wahrscheinlichkeit bedeutet
+
+Das Modell bewertet jeden Fahrer als eigenständiges Ja/Nein-Problem. Die rohen
+Werte eines Rennens summieren sich deshalb **nicht** auf die drei vorhandenen
+Podiumsplätze — gemessen über die Runden 8–11 der Saison 2026 lagen sie bei
+4,94–5,83, mit fünf bis sechs Fahrern über 50 %.
+
+Die Read-API korrigiert das beim Ausliefern: ein einziger additiver Versatz im
+Log-Odds-Raum, sodass die Summe exakt 3 ergibt (`@f1/shared/podium-normalize`).
+Der Versatz ist rangerhaltend und hält alle Werte in [0, 1]. Weil er auf dem
+**Lesepfad** sitzt, gilt er auch für alle bereits gespeicherten Rennen, ohne
+dass eine Vorhersage neu berechnet wird — in DynamoDB bleibt die rohe
+Modellausgabe als Audit-Spur stehen.
+
+Das ist bewusst eine **Normierung auf eine bekannte Nebenbedingung, keine
+gelernte Kalibrierung**. Platt/Isotonic würden einen Holdout-Fold und damit ein
+Neu-Training brauchen.
+
+Zwei Grenzen, die die Oberfläche selbst nennt statt sie zu kaschieren:
+
+- Das deployte Modell `0.2.0` ist auf 2022–2025 trainiert, und sein
+  History-Artefakt endet bei Runde 24 der Saison 2025. Die drei Formkurven-Merkmale
+  (Fahrerform, Teamform, Streckenhistorie) sind für 2026 also Vorsaison-Werte —
+  ausgerechnet im Jahr der größten Regeländerung der F1-Geschichte.
+  `ml/scripts/refresh_history.py` schreibt sie fort; das Neu-Training selbst
+  steht noch aus.
+- Gegen die triviale Baseline „Podium = die ersten drei der Quali" lagen Modell
+  und Baseline über die Runden 8–11 beide bei 7 von 12. Bei vier Rennen ist das
+  statistisch nicht belastbar — der Vergleich steht trotzdem in der App.
+
 ## Stack
 
 - **Monorepo:** pnpm workspaces (`apps/dashboard`, `apps/predictor`, `infra/`, `packages/shared`, `ml/`)

@@ -61,6 +61,11 @@ export function PodiumBoard({
   const provenance = modelProvenance(response.model_version);
   // Only claim normalization when the API actually supplied it (AC-5 fallback).
   const isNormalized = drivers.some((d) => d.podium_probability_normalized !== undefined);
+  // Whether the form features saw the season this race belongs to. Archived
+  // races keep the version that produced them (0.2.0 = history through 2025),
+  // so the same card must be able to say either thing truthfully.
+  const raceSeason = Number(response.race_date.slice(0, 4));
+  const formIsCurrent = provenance !== null && Number(provenance.historyThrough) >= raceSeason;
 
   return (
     <section className={`card ${styles.col8}`}>
@@ -138,8 +143,10 @@ export function PodiumBoard({
           <p>
             Trainiert auf den Saisons {provenance.trainedSeasons}. Die Formkurven-Merkmale (Fahrer-
             und Teamform, Streckenhistorie) stammen aus Daten bis einschließlich{" "}
-            {provenance.historyThrough} und werden im Saisonverlauf nicht fortgeschrieben — für die
-            Regeländerungen 2026 ist das eine bekannte Schwäche.
+            {provenance.historyThrough}
+            {formIsCurrent
+              ? ", also aus der laufenden Saison — das Modell selbst ist aber weiterhin auf den älteren Saisons trainiert."
+              : " und wurden für dieses Rennen nicht fortgeschrieben — für die Regeländerungen 2026 ist das eine bekannte Schwäche."}
           </p>
         ) : null}
       </div>

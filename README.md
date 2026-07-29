@@ -191,12 +191,16 @@ Neu-Training brauchen.
 
 Zwei Grenzen, die die Oberfläche selbst nennt statt sie zu kaschieren:
 
-- Das deployte Modell `0.2.0` ist auf 2022–2025 trainiert, und sein
-  History-Artefakt endet bei Runde 24 der Saison 2025. Die drei Formkurven-Merkmale
-  (Fahrerform, Teamform, Streckenhistorie) sind für 2026 also Vorsaison-Werte —
-  ausgerechnet im Jahr der größten Regeländerung der F1-Geschichte.
-  `ml/scripts/refresh_history.py` schreibt sie fort; das Neu-Training selbst
-  steht noch aus.
+- Das aktive Modell `0.2.1` ist weiterhin auf **2022–2025 trainiert** — nur sein
+  History-Artefakt reicht inzwischen bis Runde 11 der Saison 2026, sodass die drei
+  Formkurven-Merkmale (Fahrerform, Teamform, Streckenhistorie) die laufende Saison
+  abbilden. Das Neu-Training auf 2026-Daten steht weiterhin aus; im Jahr der größten
+  Regeländerung der F1-Geschichte bleibt das die wichtigste offene Schwäche.
+  `0.2.1` enthält dasselbe `model.json` wie `0.2.0` — die ältere Version bleibt
+  eingefroren, damit die unter ihr gespeicherten Vorhersagen der Runden 1–11
+  reproduzierbar bleiben (Constitution IX). `ml/scripts/refresh_history.py`
+  veröffentlicht solche Auffrischungen grundsätzlich als neue Version und
+  verweigert das Überschreiben einer bestehenden.
 - Gegen die triviale Baseline „Podium = die ersten drei der Quali" lagen Modell
   und Baseline über die Runden 8–11 beide bei 7 von 12. Bei vier Rennen ist das
   statistisch nicht belastbar — der Vergleich steht trotzdem in der App.

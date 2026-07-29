@@ -2,17 +2,22 @@
  * Where a deployed model's numbers come from (Phase 010).
  *
  * The predictor showed a probability and a version badge but never said what
- * the model had actually seen. That matters more than usual right now: the
- * artifact deployed as 0.2.0 ships a `history.csv` ending at round 24 of 2025
- * (verified against `s3://…/models/0.2.0/history.csv`), and the three rolling
- * features — `driver_form`, `constructor_form`, `track_history` — are derived
- * from it. For a 2026 race they are therefore prior-season values that do not
- * move during the season, while 2026 is the largest regulation change in the
- * sport's history.
+ * the model had actually seen. Two different things matter, and conflating
+ * them is what the map prevents:
  *
- * That limitation is real, so the UI states it instead of hiding it. This map
- * lives in `@f1/shared` because it is part of the model contract that the
- * model card also documents (Constitution IX) — not a frontend string.
+ *   - `trainedSeasons` — the fold the trees were fitted on. Still 2022–2025.
+ *   - `historyThrough` — the last season in the bundled `history.csv`, which
+ *     is where the three rolling features (`driver_form`, `constructor_form`,
+ *     `track_history`) come from.
+ *
+ * They can legitimately differ: 0.2.1 is the same fitted model as 0.2.0 with a
+ * history extended into 2026, so its form features track the running season
+ * while its training window does not. Predictions stored under 0.2.0 keep
+ * pointing at the frozen-2025 artifact that produced them, which is why the
+ * lookup is per-version rather than a single global statement.
+ *
+ * This map lives in `@f1/shared` because it is part of the model contract that
+ * the model card also documents (Constitution IX) — not a frontend string.
  *
  * Keep in sync with `ml/notebooks/train_podium_model.ipynb` (`FIRST_YEAR`,
  * `TRAIN_MAX_YEAR`, `VAL_YEAR`, `TEST_YEAR`) whenever a version is published.
@@ -27,6 +32,10 @@ export interface ModelProvenance {
 export const MODEL_PROVENANCE: Readonly<Record<string, ModelProvenance>> = {
   "0.1.0": { trainedSeasons: "2022–2025", historyThrough: "2025" },
   "0.2.0": { trainedSeasons: "2022–2025", historyThrough: "2025" },
+  // Same fitted model as 0.2.0, history extended through round 11 of 2026
+  // (Phase 010). The training window is unchanged — only the rolling form
+  // features are current, which is exactly what the disclosure must convey.
+  "0.2.1": { trainedSeasons: "2022–2025", historyThrough: "2026" },
 };
 
 /**

@@ -8,13 +8,24 @@ script appends the season's finished races and re-uploads the artifact, turning
 what was a manual runbook step into one reproducible command.
 
     cd ml
-    .venv/bin/python scripts/refresh_history.py --version 0.2.0 --year 2026 --dry-run
-    .venv/bin/python scripts/refresh_history.py --version 0.2.0 --year 2026 --rounds 1-11
-    AWS_PROFILE=private .venv/bin/python scripts/refresh_history.py --version 0.2.0 --year 2026
+    .venv/bin/python scripts/refresh_history.py \
+        --version 0.2.0 --target-version 0.2.1 --year 2026 --rounds 1-11 --dry-run
+    AWS_PROFILE=private .venv/bin/python scripts/refresh_history.py \
+        --version 0.2.0 --target-version 0.2.1 --year 2026 --rounds 1-11
+
+Reads the history of `--version` and publishes the merged result as a **new**
+`--target-version`, copying `model.json` and `model_card.md` over unchanged so
+the new bundle stands on its own. Overwriting the source version is rejected:
+predictions already stored under it record that version, and changing its
+history would leave them unreproducible.
 
 Without `--rounds` it resumes: it loads whatever rounds follow the highest one
 already present for that season. `--dry-run` writes the merged frame locally to
-`artifacts/<version>/history.csv` and uploads nothing.
+`artifacts/<target-version>/history.csv` and uploads nothing.
+
+After a real run, set `ACTIVE_MODEL_VERSION` in `infra/lib/pipeline-stack.ts`
+to the new version, add it to `MODEL_PROVENANCE` in `@f1/shared`, and deploy
+`F1-Pipeline` — otherwise the artifact exists but nothing uses it.
 
 Deliberately **not** part of CI — it needs FastF1, network and AWS credentials.
 The merge logic it wraps (`f1pred.history.append_races`) is pure and is what the
@@ -37,7 +48,7 @@ import pandas as pd
 
 from f1pred.data import RACE_COLUMNS, fastf1_load_race, fastf1_rounds_for_year
 from f1pred.history import append_races, latest_round, seasons_covered
-from f1pred.layout import model_history_key
+from f1pred.layout import model_artifact_key, model_card_key, model_history_key
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("refresh-history")
@@ -110,7 +121,12 @@ def resolve_rounds(history: pd.DataFrame, year: int, spec: str | None) -> list[i
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", required=True, help="model version, e.g. 0.2.0")
+    parser.add_argument("--version", required=True, help="model version to read, e.g. 0.2.0")
+    parser.add_argument(
+        "--target-version",
+        required=True,
+        help="model version to publish to, e.g. 0.2.1 (must differ from --version)",
+    )
     parser.add_argument("--year", type=int, required=True, help="season to append, e.g. 2026")
     parser.add_argument(
         "--rounds", help="e.g. 1-11 or 1,4,7 (default: resume after the last known)"
@@ -119,6 +135,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--local-dir", default="artifacts", help="where to write the merged CSV")
     parser.add_argument("--dry-run", action="store_true", help="write locally, upload nothing")
     args = parser.parse_args(argv)
+
+    # Refusing an in-place overwrite is the point of this flag. A published
+    # version's history is what makes its stored predictions reproducible: the
+    # rows written for rounds 1-11 record `model_version: "0.2.0"`, so silently
+    # changing what 0.2.0's history contains would leave them pointing at an
+    # artifact that can no longer produce them. Same failure mode the
+    # "never latest/" rule exists to prevent (Constitution IX).
+    if args.target_version == args.version:
+        parser.error(
+            "--target-version must differ from --version; overwriting a published "
+            "history breaks the reproducibility of predictions already stored under it"
+        )
 
     bucket = args.bucket or os.environ.get("F1_DATA_BUCKET")
     if not bucket:
@@ -142,7 +170,7 @@ def main(argv: list[str] | None = None) -> int:
     merged = append_races(history, new_races)
     added = len(merged) - len(history)
 
-    out_dir = Path(args.local_dir) / args.version
+    out_dir = Path(args.local_dir) / args.target_version
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "history.csv"
     merged.to_csv(out_path, index=False)
@@ -158,9 +186,18 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("--dry-run: not uploading")
         return 0
 
-    key = model_history_key(args.version)
+    # Carry the model itself over unchanged — only the history differs between
+    # these two versions, but the artifact bundle must stay self-contained so
+    # the new version can be loaded on its own.
+    for key_of in (model_artifact_key, model_card_key):
+        src, dst = key_of(args.version), key_of(args.target_version)
+        s3.copy_object(Bucket=bucket, CopySource={"Bucket": bucket, "Key": src}, Key=dst)
+        logger.info("copied s3://%s/%s -> %s", bucket, src, dst)
+
+    key = model_history_key(args.target_version)
     s3.put_object(Bucket=bucket, Key=key, Body=out_path.read_bytes())
     logger.info("uploaded s3://%s/%s", bucket, key)
+    logger.info("remember: set ACTIVE_MODEL_VERSION to %s and deploy", args.target_version)
     return 0
 
 

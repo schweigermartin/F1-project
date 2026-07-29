@@ -30,9 +30,18 @@ const lambdaDir = (sub: string): string => path.resolve(__dirname, "..", "lambda
 
 /** Active published model the inference schedules point at (models/<v>/, Ph. 3).
  * 0.2.0 (Phase 6: +6 quali/practice features) passed the roll-out gate vs 0.1.0
- * on the 2025 test fold (ROC-AUC + log-loss both better). 0.1.0 stays in S3 as
- * the fallback — flip this constant back + redeploy to revert. */
-const ACTIVE_MODEL_VERSION = "0.2.0";
+ * on the 2025 test fold (ROC-AUC + log-loss both better).
+ *
+ * 0.2.1 (Phase 10) is that same model — `model.json` is byte-identical — with a
+ * history artifact extended through round 11 of 2026, so the rolling form
+ * features reflect the running season instead of ending at Abu Dhabi 2025.
+ * Published as a new version rather than overwriting 0.2.0 because the
+ * predictions already stored for rounds 1–11 record `model_version: "0.2.0"`
+ * and must stay reproducible from that artifact (Constitution IX).
+ *
+ * Earlier versions stay in S3 as fallbacks — flip this constant back +
+ * redeploy to revert. */
+const ACTIVE_MODEL_VERSION = "0.2.1";
 
 /** DLQ for the Phase-9 one-shot ingest schedules. Fixed name so schedule-sync
  * can build the ARN without a cross-stack ref (same pattern as the inference DLQ). */

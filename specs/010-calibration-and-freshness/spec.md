@@ -1,7 +1,7 @@
 # Spec: Kalibrierung & Aktualität — ehrliche Wahrscheinlichkeiten, frische Formkurven
 
 > **Phase:** 010
-> **Status:** implemented — T1–T19 gebaut, getestet und deployt. Gate grün (lint, prettier, typecheck, 538 vitest, `cdk synth`, ruff, mypy, 122 pytest). `F1-Inference` am 2026-07-28 deployt; AC-1 bis AC-4 an vier gespeicherten Rennen live verifiziert (Σ normiert = 3,000000 bei allen vier, Rangfolge unverändert). **Offen:** T20 — der reale `refresh_history`-Lauf für 2026 R1–R11 überschreibt das produktive Artefakt `models/0.2.0/history.csv` und steht noch aus; bis dahin rechnen die Formkurven weiter mit Daten bis Ende 2025 (die UI sagt das jetzt selbst).
+> **Status:** done — T1–T21 gebaut, getestet, deployt und verifiziert. `F1-Inference` am 2026-07-28 (Normierung live: Σ = 3,000000 an vier gespeicherten Rennen), Modell `0.2.1` am 2026-07-29 veröffentlicht (History bis 2026 R11, `0.2.0` eingefroren) und `F1-Pipeline` mit `ACTIVE_MODEL_VERSION = 0.2.1` deployt. **Die verbleibende Schwäche ist bewusst nicht Teil dieser Phase:** das Modell ist weiterhin auf 2022–2025 trainiert — nur seine Formkurven sind jetzt aktuell. Neu-Training auf 2026-Daten (Modell 0.3.0) ist die Folgephase.
 > **Owner:** Martin
 > **Constitution:** II (jede Phase liefert Vorzeigbares), III (geteilte Basis), IV (Kostenkontrolle), V (Demo muss jederzeit funktionieren), VI (Zod an allen Grenzen), IX (Modell-Artefakte versioniert + Model Card), X (pragmatische Tests), XII (README aktuell).
 

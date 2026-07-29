@@ -59,3 +59,15 @@ def test_resolve_rounds_prefers_an_explicit_spec() -> None:
     # No FastF1 call happens on this path, which is what makes it testable.
     empty = pd.DataFrame(columns=RACE_COLUMNS)
     assert script.resolve_rounds(empty, 2026, "2-4") == [2, 3, 4]
+
+
+def test_refuses_to_overwrite_the_source_version() -> None:
+    """A published history must not be mutated in place — predictions already
+    stored under that version record it and must stay reproducible."""
+    with pytest.raises(SystemExit):
+        script.main(["--version", "0.2.0", "--target-version", "0.2.0", "--year", "2026"])
+
+
+def test_requires_a_target_version() -> None:
+    with pytest.raises(SystemExit):
+        script.main(["--version", "0.2.0", "--year", "2026"])

@@ -26,7 +26,7 @@ class TestDepsStack extends Stack {
   }
 }
 
-function synth(): Template {
+function buildTemplate(): Template {
   const app = new App();
   const deps = new TestDepsStack(app, "TestDeps");
   const stack = new RealtimeStack(app, "TestRealtime", {
@@ -35,6 +35,19 @@ function synth(): Template {
     alertTopic: deps.topic,
   });
   return Template.fromStack(stack);
+}
+
+/**
+ * Memoized: every call builds the identical stack (the function takes no
+ * arguments and CDK synth is deterministic), and `Template` is only ever read
+ * by assertions. Re-synthesizing per test cost 2.5-4s each — with 26 calls in
+ * this file that dominated CI runtime and pushed individual tests past vitest's
+ * 5s default timeout. Building it once keeps the assertions unchanged.
+ */
+let cachedTemplate: Template | undefined;
+function synth(): Template {
+  cachedTemplate ??= buildTemplate();
+  return cachedTemplate;
 }
 
 describe("RealtimeStack — F1Connections table", () => {
